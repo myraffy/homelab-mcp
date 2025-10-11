@@ -1,0 +1,136 @@
+---
+# Sample Ansible Inventory for Homelab MCP Servers
+# Copy this file and customize for your infrastructure
+
+all:
+  children:
+    # ==========================================================================
+    # Ollama AI Servers
+    # ==========================================================================
+    ollama_servers:
+      vars:
+        ollama_host: 0.0.0.0
+        ollama_port: 11434
+        ollama_origins: "*"
+        ollama_keep_alive: 24h
+      
+      children:
+        ollama_linux:
+          children:
+            ollama_ubuntu_servers:
+              hosts:
+                server1.example.local:
+                  ansible_host: 192.168.1.100
+                server2.example.local:
+                  ansible_host: 192.168.1.101
+            
+            ollama_rocky:
+              hosts:
+                server3.example.local:
+                  ansible_host: 192.168.1.102
+        
+        ollama_mac:
+          hosts:
+            mac-mini.example.local:
+              ansible_host: 192.168.1.103
+        
+        ollama_windows:
+          hosts:
+            windows-pc.example.local:
+              ansible_host: 192.168.1.104
+
+    # ==========================================================================
+    # LiteLLM Proxy Servers
+    # ==========================================================================
+    litellm_servers:
+      hosts:
+        server1.example.local:
+          ansible_host: 192.168.1.100
+
+    # ==========================================================================
+    # Docker/Podman Container Hosts
+    # ==========================================================================
+    docker_hosts:
+      hosts:
+        server1.example.local:
+          ansible_host: 192.168.1.100
+          container_runtime: docker
+          docker_api_port: 2375
+        
+        server2.example.local:
+          ansible_host: 192.168.1.101
+          container_runtime: docker
+          docker_api_port: 2375
+        
+        server3.example.local:
+          ansible_host: 192.168.1.105
+          container_runtime: docker
+          docker_api_port: 2375
+    
+    podman_hosts:
+      hosts:
+        nas-server.example.local:
+          ansible_host: 192.168.1.102
+          container_runtime: podman
+          podman_api_port: 8080
+
+    # ==========================================================================
+    # Pi-hole DNS Servers
+    # ==========================================================================
+    pihole_servers:
+      children:
+        pihole_docker:
+          hosts:
+            server1.example.local:
+              ansible_host: 192.168.1.100
+              pihole_port: 8053
+            
+            server2.example.local:
+              ansible_host: 192.168.1.101
+              pihole_port: 8053
+        
+        pihole_native:
+          hosts:
+            pihole-pi.example.local:
+              ansible_host: 192.168.1.253
+              pihole_port: 80
+
+    # ==========================================================================
+    # Unifi Network Controller
+    # ==========================================================================
+    unifi_controller:
+      hosts:
+        unifi-controller.example.local:
+          ansible_host: 192.168.1.1
+
+    # ==========================================================================
+    # OS-Based Groups
+    # ==========================================================================
+    ubuntu_servers:
+      hosts:
+        server1.example.local:
+        server2.example.local:
+    
+    rocky_linux:
+      hosts:
+        server3.example.local:
+    
+    macos:
+      hosts:
+        mac-mini.example.local:
+    
+    windows:
+      hosts:
+        windows-pc.example.local:
+
+    # ==========================================================================
+    # Location-Based Groups (Optional)
+    # ==========================================================================
+    datacenter:
+      hosts:
+        server1.example.local:
+    
+    office:
+      hosts:
+        server2.example.local:
+        mac-mini.example.local:

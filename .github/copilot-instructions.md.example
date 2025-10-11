@@ -1,0 +1,122 @@
+# Homelab Infrastructure - AI Agent Instructions
+
+## Project Context
+This is a homelab MCP (Model Context Protocol) server collection providing real-time infrastructure monitoring and management for Claude Desktop. **Key insight**: This is production infrastructure with specialized MCP servers monitoring hosts across multiple services.
+
+## Architecture Overview
+**Core Pattern**: Configuration hierarchy with Ansible inventory as single source of truth → .env fallback → defaults
+
+### Example Infrastructure
+- **Primary Server** - Docker, LiteLLM proxy, Ollama, Pi-hole, automation
+- **Secondary Server** - Docker, Ollama, Pi-hole, Home Assistant  
+- **Storage Server** - Rocky Linux, Podman, NAS, Ollama
+- **Monitoring Server** - Docker monitoring tools
+
+## MCP Server Architecture
+
+**Critical**: Each MCP server follows async pattern with `@server.list_tools()` and `@server.call_tool()` decorators. All return `list[types.TextContent]`.
+
+### Production Monitors
+- **ansible_mcp_server.py** - Infrastructure source of truth from Ansible inventory
+- **docker_mcp_podman.py** - Container monitoring across Docker and Podman hosts
+- **ollama_mcp.py** - AI model tracking with LiteLLM proxy support
+- **pihole_mcp.py** - DNS filtering stats from Pi-hole instances
+- **unifi_mcp_optimized.py** - Network monitoring via Unifi controller
+
+### Development Tools  
+- **mcp_registry_inspector.py** - **Unique capability**: Direct file read/write for MCP development
+- **n8n-mcp** - Workflow automation (Docker container)
+
+## Configuration Patterns
+
+### Three-Tier Config Hierarchy
+1. **Ansible Inventory** (Primary) - Path configured in `ANSIBLE_INVENTORY_PATH`
+2. **Environment Variables** (Fallback) - `.env` file (gitignored)
+3. **Defaults** (Last resort) - Generic defaults in source
+
+### Essential Files
+- `.env.example` - Configuration template (safe to commit)
+- `requirements.txt` - Python dependencies
+- `PROJECT_INSTRUCTIONS.md` - Detailed usage guide
+
+## Development Standards
+
+### MCP Server Pattern (Required)
+```python
+import mcp.types as types
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+
+server = Server("server-name")
+
+@server.list_tools()
+async def list_tools() -> list[types.Tool]:
+    return [types.Tool(...)]
+
+@server.call_tool()
+async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+    return [types.TextContent(type="text", text="result")]
+
+async def main():
+    async with stdio_server() as (read_stream, write_stream):
+        await server.run(read_stream, write_stream)
+```
+
+### Critical Rules
+- **Logging**: Use `logging.basicConfig(stream=sys.stderr)` - stdout conflicts with MCP protocol
+- **Config Loading**: Try Ansible → .env → defaults (see `docker_mcp_podman.py` for example)
+- **Windows Paths**: Use `Path()` objects, mind backslashes
+- **Dependencies**: Async HTTP with `aiohttp`, YAML with `pyyaml`
+
+### Never Hardcode Infrastructure Values
+Use the three-tier config hierarchy. Example: `pihole_mcp.py` loads Pi-hole endpoints from Ansible inventory first.
+
+## Key Developer Workflows
+
+### Testing MCP Servers
+1. Make changes to `.py` file
+2. Restart Claude Desktop (required for MCP reload)
+3. Test functionality through Claude chat
+4. Check logs via `logging` to stderr (not visible in Claude)
+
+### Adding New Infrastructure
+1. **Always** add to Ansible inventory first (`ansible_hosts.yml`)
+2. MCP servers auto-discover via inventory parsing
+3. Add secrets to `.env` only if needed
+4. Test with `ansible-inventory` MCP to verify discovery
+
+### Using mcp_registry_inspector
+**Unique capability**: Direct file modification
+```python
+# Can read any MCP file
+read_mcp_file("docker_mcp_podman.py") 
+
+# Can write/update MCP files directly  
+write_mcp_file("new_server.py", content)
+```
+
+## Critical Gotchas
+
+### Windows Environment
+- Use `Path()` objects for file paths (handles backslashes)
+- PowerShell is default shell (`pwsh.exe`)
+- Config hierarchy prevents hardcoded paths/IPs
+
+### MCP Protocol Constraints  
+- **Never** print to stdout (breaks MCP communication)
+- All logging must go to `sys.stderr`
+- Must return `list[types.TextContent]` from tool calls
+- Claude Desktop restart required after code changes
+
+### Production Infrastructure
+- Multiple hosts across VLANs and services
+- Real services with active DNS queries
+- Use Ansible inventory, not hardcoded values
+- Test changes carefully - this affects real infrastructure
+
+## File Patterns
+- MCP servers: `{service}_mcp.py` or `{service}_mcp_{variant}.py`  
+- Config templates: `.example` suffix (safe to commit)
+- Archives: `archive-ignore/` directory
+
+**Dependencies**: `mcp`, `aiohttp`, `pyyaml`, `requests` (see `requirements.txt`)

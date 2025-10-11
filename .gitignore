@@ -1,0 +1,49 @@
+# Environment variables with sensitive data
+.env
+
+# Environment-specific AI instructions (use .example versions)
+.github/copilot-instructions.md
+
+# Project instructions with real infrastructure details
+PROJECT_INSTRUCTIONS.md
+
+# Real Ansible inventory with actual IP addresses
+ansible_hosts.yml
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Unifi export cache
+unifi_export/
+*.json
+
+# Logs
+*.log
+
+# Test files
+test_*.py
+*_test.py
+
+# Archive directory
+archive-ignore/

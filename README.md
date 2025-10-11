@@ -1,0 +1,586 @@
+# Homelab MCP Servers
+
+A collection of Model Context Protocol (MCP) servers for managing and monitoring your homelab infrastructure through Claude Desktop.
+
+## 🔒 Security Notice
+
+**⚠️ IMPORTANT: Please read [SECURITY.md](SECURITY.md) before deploying this project.**
+
+This project interacts with critical infrastructure (Docker APIs, DNS, network devices). Improper configuration can expose your homelab to security risks.
+
+**Key Security Requirements:**
+- **NEVER expose Docker/Podman APIs to the internet** - Use firewall rules to restrict access
+- **Keep `.env` file secure** - Contains API keys and should never be committed
+- **Use unique API keys** - Generate separate keys for each service
+- **Review network security** - Ensure proper VLAN segmentation and firewall rules
+
+See [SECURITY.md](SECURITY.md) for comprehensive security guidance.
+
+## 📖 Important: Configure Claude Project Instructions
+
+After setting up the MCP servers, **create your personalized project instructions**:
+
+1. **Copy the example template:**
+   ```bash
+   # Windows
+   copy PROJECT_INSTRUCTIONS.example.md PROJECT_INSTRUCTIONS.md
+   
+   # Linux/Mac
+   cp PROJECT_INSTRUCTIONS.example.md PROJECT_INSTRUCTIONS.md
+   ```
+
+2. **Edit `PROJECT_INSTRUCTIONS.md`** with your actual infrastructure details:
+   - Replace example IP addresses with your real network addresses
+   - Add your actual server hostnames
+   - Customize with your specific services and configurations
+   - **Keep this file private** - it contains your network topology
+
+3. **Add to Claude Desktop:**
+   - Open Claude Desktop
+   - Go to your project settings
+   - Copy the contents of your customized `PROJECT_INSTRUCTIONS.md`
+   - Paste into the "Project instructions" field
+
+**What's included:**
+- Detailed MCP server capabilities and usage patterns
+- Infrastructure overview and monitoring capabilities  
+- Specific commands and tools available for each service
+- Troubleshooting and development guidance
+
+This README covers installation and basic setup. The project instructions provide Claude with comprehensive usage context.
+
+## 🚀 Quick Start
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/bjeans/homelab-mcp
+cd homelab-mcp
+```
+
+### 2. Set up configuration files
+
+**Environment variables:**
+```bash
+# Windows
+copy .env.example .env
+
+# Linux/Mac
+cp .env.example .env
+```
+
+Edit `.env` with your actual values:
+```bash
+# Windows
+notepad .env
+
+# Linux/Mac
+nano .env
+```
+
+**Ansible inventory (if using):**
+```bash
+# Windows
+copy ansible_hosts.example.yml ansible_hosts.yml
+
+# Linux/Mac
+cp ansible_hosts.example.yml ansible_hosts.yml
+```
+
+Edit with your infrastructure details.
+
+**Project instructions:**
+```bash
+# Windows
+copy PROJECT_INSTRUCTIONS.example.md PROJECT_INSTRUCTIONS.md
+
+# Linux/Mac
+cp PROJECT_INSTRUCTIONS.example.md PROJECT_INSTRUCTIONS.md
+```
+
+Customize with your network topology and servers.
+
+### 3. Install Python dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Add to Claude Desktop config
+
+**Config file location:**
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+**Add the MCP servers:**
+```json
+{
+  "mcpServers": {
+    "mcp-registry-inspector": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\mcp_registry_inspector.py"]
+    },
+    "docker": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\docker_mcp_podman.py"]
+    },
+    "ollama": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\ollama_mcp.py"]
+    },
+    "pihole": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\pihole_mcp.py"]
+    },
+    "unifi": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\unifi_mcp_optimized.py"]
+    },
+    "ansible-inventory": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\ansible_mcp_server.py"]
+    }
+  }
+}
+```
+
+### 5. Restart Claude Desktop
+
+### 6. Add project instructions to Claude
+- Copy the contents of your customized `PROJECT_INSTRUCTIONS.md` 
+- Paste into your Claude project's "Project instructions" field
+- This gives Claude comprehensive context about your MCP capabilities
+
+## 📦 Available MCP Servers
+
+### MCP Registry Inspector
+Provides introspection into your MCP development environment.
+
+**Tools:**
+- `get_claude_config` - View Claude Desktop MCP configuration
+- `list_mcp_servers` - List all registered MCP servers
+- `list_mcp_directory` - Browse MCP development directory
+- `read_mcp_file` - Read MCP server source code
+- `write_mcp_file` - Write/update MCP server files
+- `search_mcp_files` - Search for files by name
+
+**Configuration:**
+```bash
+MCP_DIRECTORY=/path/to/your/Homelab-MCP
+CLAUDE_CONFIG_PATH=/path/to/claude_desktop_config.json  # Optional
+```
+
+### Docker/Podman Container Manager
+Manage Docker and Podman containers across multiple hosts.
+
+**🔒 Security Warning:** Docker/Podman APIs typically use unencrypted HTTP without authentication. See [SECURITY.md](SECURITY.md) for required firewall configuration.
+
+**Tools:**
+- `get_docker_containers` - Get containers on a specific host
+- `get_all_containers` - Get all containers across all hosts
+- `get_container_stats` - Get CPU and memory stats
+- `check_container` - Check if a specific container is running
+
+**Configuration Options:**
+
+*Option 1: Using Ansible Inventory (Recommended)*
+```bash
+ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
+```
+
+*Option 2: Using Environment Variables*
+```bash
+DOCKER_SERVER1_ENDPOINT=192.168.1.100:2375
+DOCKER_SERVER2_ENDPOINT=192.168.1.101:2375
+PODMAN_SERVER1_ENDPOINT=192.168.1.102:8080
+```
+
+### Ollama AI Model Manager
+Monitor and manage Ollama AI model instances and LiteLLM proxy.
+
+**Tools:**
+- `get_ollama_status` - Check status of all Ollama instances
+- `get_ollama_models` - Get models on a specific host
+- `get_litellm_status` - Check LiteLLM proxy status
+
+**Configuration Options:**
+
+*Option 1: Using Ansible Inventory (Recommended)*
+```bash
+ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
+OLLAMA_PORT=11434  # Default port
+```
+
+*Option 2: Using Environment Variables*
+```bash
+OLLAMA_SERVER1=192.168.1.100
+OLLAMA_SERVER2=192.168.1.101
+OLLAMA_WORKSTATION=192.168.1.150
+LITELLM_HOST=192.168.1.100
+LITELLM_PORT=4000
+```
+
+### Pi-hole DNS Manager
+Monitor Pi-hole DNS statistics and status.
+
+**🔒 Security Note:** Store Pi-hole API keys securely in `.env` file. Generate unique keys per instance.
+
+**Tools:**
+- `get_pihole_stats` - Get DNS statistics from all Pi-hole instances
+- `get_pihole_status` - Check which Pi-hole instances are online
+
+**Configuration Options:**
+
+*Option 1: Using Ansible Inventory (Recommended)*
+```bash
+ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
+# API keys still required in .env:
+PIHOLE_API_KEY_SERVER1=your-api-key-here
+PIHOLE_API_KEY_SERVER2=your-api-key-here
+```
+
+*Option 2: Using Environment Variables*
+```bash
+PIHOLE_API_KEY_SERVER1=your-api-key
+PIHOLE_API_KEY_SERVER2=your-api-key
+PIHOLE_SERVER1_HOST=pihole1.local
+PIHOLE_SERVER1_PORT=80
+PIHOLE_SERVER2_HOST=pihole2.local
+PIHOLE_SERVER2_PORT=8053
+```
+
+**Getting Pi-hole API Keys:**
+- Web UI: Settings → API → Show API Token
+- Or generate new: `pihole -a -p` on Pi-hole server
+
+### Unifi Network Monitor
+Monitor Unifi network infrastructure and clients with caching for performance.
+
+**🔒 Security Note:** Use a dedicated API key with minimal required permissions.
+
+**Tools:**
+- `get_network_devices` - Get all network devices (switches, APs, gateways)
+- `get_network_clients` - Get all active network clients
+- `get_network_summary` - Get network overview
+- `refresh_network_data` - Force refresh from controller (bypasses cache)
+
+**Configuration:**
+```bash
+UNIFI_API_KEY=your-unifi-api-key
+UNIFI_HOST=192.168.1.1
+```
+
+**Note:** Data is cached for 5 minutes to improve performance. Use `refresh_network_data` to force update.
+
+### Ansible Inventory Inspector
+Query Ansible inventory information (read-only).
+
+**Tools:**
+- `get_all_hosts` - Get all hosts in inventory
+- `get_all_groups` - Get all groups
+- `get_host_details` - Get detailed host information
+- `get_group_details` - Get detailed group information
+- `get_hosts_by_group` - Get hosts in specific group
+- `search_hosts` - Search hosts by pattern or variable
+- `get_inventory_summary` - High-level inventory overview
+- `reload_inventory` - Reload inventory from disk
+
+**Configuration:**
+```bash
+ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
+```
+
+## 🔒 Security
+
+### Critical Security Practices
+
+**Configuration Files:**
+- ✅ **DO** use `.env.example` as a template
+- ✅ **DO** keep `.env` file permissions restrictive (`chmod 600` on Linux/Mac)
+- ❌ **NEVER** commit `.env` to version control
+- ❌ **NEVER** commit `ansible_hosts.yml` with real infrastructure
+- ❌ **NEVER** commit `PROJECT_INSTRUCTIONS.md` with real network topology
+
+**API Security:**
+- ✅ **DO** use unique API keys for each service
+- ✅ **DO** rotate API keys regularly (every 90 days recommended)
+- ✅ **DO** use strong, randomly-generated keys (32+ characters)
+- ❌ **NEVER** expose Docker/Podman APIs to the internet
+- ❌ **NEVER** reuse API keys between environments
+
+**Network Security:**
+- ✅ **DO** use firewall rules to restrict API access
+- ✅ **DO** implement VLAN segmentation
+- ✅ **DO** enable TLS/HTTPS where possible
+- ❌ **NEVER** expose management interfaces publicly
+
+**For detailed security guidance, see [SECURITY.md](SECURITY.md)**
+
+## 📋 Requirements
+
+### System Requirements
+- **Python**: 3.9 or higher
+- **Claude Desktop**: Latest version recommended
+- **Network Access**: Connectivity to homelab services
+
+### Python Dependencies
+Install via `requirements.txt`:
+```bash
+pip install -r requirements.txt
+```
+
+Core dependencies:
+- `mcp` - Model Context Protocol SDK
+- `aiohttp` - Async HTTP client
+- `pyyaml` - YAML parsing for Ansible inventory
+
+### Service Requirements
+- **Docker/Podman**: API enabled on monitored hosts
+- **Pi-hole**: v6+ with API enabled
+- **Unifi Controller**: API access enabled
+- **Ollama**: Running instances with API accessible
+- **Ansible**: Inventory file (optional but recommended)
+
+## 💻 Compatibility
+
+### Tested Platforms
+**Developed and tested on:**
+- **OS**: Windows 11
+- **Claude Desktop**: Version 0.13.64
+- **Python**: Version 3.13.8
+
+### Cross-Platform Notes
+**Windows**: Fully tested and supported ✅
+**macOS**: Should work but untested ⚠️
+**Linux**: Should work but untested ⚠️
+
+**Known platform differences:**
+- File paths in documentation are Windows-style
+- Path separators may need adjustment for Unix systems
+- `.env` file permissions should be set on Unix (`chmod 600 .env`)
+
+**Contributions for other platforms welcome!**
+
+## 🛠️ Development
+
+### Project Structure
+```
+Homelab-MCP/
+├── .env.example              # Template for environment variables
+├── .gitignore               # Excludes sensitive files
+├── SECURITY.md              # Security best practices
+├── README.md                # This file
+├── requirements.txt         # Python dependencies
+├── ansible_hosts.example.yml    # Example Ansible inventory
+├── PROJECT_INSTRUCTIONS.example.md  # Example Claude instructions
+├── pre_publish_check.py     # Security checker script
+├── ansible_mcp_server.py    # Ansible inventory MCP
+├── docker_mcp_podman.py     # Docker/Podman MCP
+├── ollama_mcp.py            # Ollama AI MCP
+├── pihole_mcp.py            # Pi-hole DNS MCP
+├── unifi_mcp_optimized.py   # Unifi network MCP
+├── unifi_exporter.py        # Unifi data export utility
+└── mcp_registry_inspector.py  # MCP development tools
+```
+
+### Adding a New MCP Server
+
+1. **Create the server file**
+   ```python
+   #!/usr/bin/env python3
+   """
+   My Service MCP Server
+   Description of what it does
+   """
+   import asyncio
+   from mcp.server import Server
+   # ... implement tools ...
+   ```
+
+2. **Add configuration to `.env.example`**
+   ```bash
+   # My Service Configuration
+   MY_SERVICE_HOST=192.168.1.100
+   MY_SERVICE_API_KEY=your-api-key
+   ```
+
+3. **Update documentation**
+   - Add server details to this README
+   - Update `PROJECT_INSTRUCTIONS.example.md`
+   - Add security notes if applicable
+
+4. **Test thoroughly**
+   - Test with real infrastructure
+   - Verify error handling
+   - Check for sensitive data leaks
+   - Review security implications
+
+### Environment Variables
+
+All MCP servers support two configuration methods:
+
+**1. Environment Variables (`.env` file)**
+- Simple key=value pairs
+- Loaded automatically by each MCP server
+- Good for simple setups or testing
+
+**2. Ansible Inventory (recommended for production)**
+- Centralized infrastructure definition
+- Supports complex host groupings
+- Better for multi-host environments
+- Set `ANSIBLE_INVENTORY_PATH` in `.env`
+
+### Coding Standards
+
+- **Python 3.9+** syntax and features
+- **Async/await** for all I/O operations
+- **Type hints** where beneficial
+- **Error handling** for network operations
+- **Logging** to stderr for debugging
+- **Security**: Validate inputs, sanitize outputs
+
+### Testing Checklist
+
+Before committing changes:
+- [ ] No sensitive data in code or commits
+- [ ] Environment variables for all configuration
+- [ ] Error handling for network failures
+- [ ] Logging doesn't expose secrets
+- [ ] Documentation updated
+- [ ] Security implications reviewed
+- [ ] `.gitignore` updated if needed
+
+## 🐛 Troubleshooting
+
+### MCP Servers Not Appearing in Claude
+
+1. **Check Claude Desktop config:**
+   ```bash
+   # Windows
+   type %APPDATA%\Claude\claude_desktop_config.json
+   
+   # Mac/Linux
+   cat ~/.config/Claude/claude_desktop_config.json
+   ```
+
+2. **Verify Python path is correct** in config
+3. **Restart Claude Desktop** completely
+4. **Check logs** - MCP servers log to stderr
+
+### Connection Errors
+
+**Docker/Podman API:**
+```bash
+# Test connectivity
+curl http://your-host:2375/containers/json
+
+# Check firewall
+netstat -an | grep 2375
+```
+
+**Pi-hole API:**
+```bash
+# Test API key
+curl "http://your-pihole/api/stats/summary?sid=YOUR_API_KEY"
+```
+
+**Ollama:**
+```bash
+# Test Ollama endpoint
+curl http://your-host:11434/api/tags
+```
+
+### Import Errors
+
+If you get Python import errors:
+```bash
+# Reinstall dependencies
+pip install --upgrade -r requirements.txt
+
+# Verify MCP installation
+pip show mcp
+```
+
+### Permission Errors
+
+**On Linux/Mac:**
+```bash
+# Fix .env permissions
+chmod 600 .env
+
+# Make scripts executable
+chmod +x *.py
+```
+
+## 📚 Additional Resources
+
+### MCP Protocol
+- [MCP Documentation](https://modelcontextprotocol.io/)
+- [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
+- [Claude Desktop MCP Guide](https://docs.anthropic.com/claude/docs)
+
+### Related Projects
+- [Ansible Documentation](https://docs.ansible.com/)
+- [Docker API Reference](https://docs.docker.com/engine/api/)
+- [Pi-hole API](https://docs.pi-hole.net/)
+- [Unifi Controller API](https://ubntwiki.com/products/software/unifi-controller/api)
+- [Ollama API](https://github.com/ollama/ollama/blob/main/docs/api.md)
+
+## 📄 License
+
+MIT License - See LICENSE file for details
+
+Copyright (c) 2024
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+
+## 🤝 Contributing
+
+Contributions are welcome! Here's how to contribute:
+
+### Before Submitting
+
+1. **Review security guidelines** in [SECURITY.md](SECURITY.md)
+2. **No sensitive data** in commits
+3. **All configuration** uses environment variables or Ansible
+4. **Update documentation** for any changes
+5. **Test thoroughly** with real infrastructure
+
+### Pull Request Process
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Test with your homelab setup
+5. Update README and other docs as needed
+6. Commit with clear messages (`git commit -m 'Add amazing feature'`)
+7. Push to your fork (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+### Code Review Criteria
+
+- Security best practices followed
+- No hardcoded credentials or IPs
+- Proper error handling
+- Code follows existing patterns
+- Documentation is clear and complete
+- Changes are tested
+
+## 🙏 Acknowledgments
+
+- [Anthropic](https://anthropic.com/) for Claude and MCP
+- The homelab community for inspiration
+- Contributors and testers
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/bjeans/homelab-mcp/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/bjeans/homelab-mcp/discussions)
+- **Security**: See [SECURITY.md](SECURITY.md) for reporting vulnerabilities
+
+---
+
+**Remember**: This project handles critical infrastructure. Always prioritize security and test changes in a safe environment first!
