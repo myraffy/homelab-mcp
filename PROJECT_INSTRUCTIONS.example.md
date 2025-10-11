@@ -2,6 +2,22 @@
 
 **⚠️ IMPORTANT: This is an example template. Copy this to `PROJECT_INSTRUCTIONS.md` and customize with your actual infrastructure details.**
 
+## Project Information
+
+**Project Name:** Homelab MCP Servers
+**GitHub Repository:** https://github.com/bjeans/homelab-mcp
+**Documentation:** See README.md and SECURITY.md in the repository
+**Version:** 1.0.0 (Released: 2025-10-11)
+
+**About this project:**
+This is an open-source collection of Model Context Protocol (MCP) servers for managing homelab infrastructure through Claude Desktop. It provides real-time monitoring and control of Docker/Podman containers, Ollama AI models, Pi-hole DNS, Unifi networks, and Ansible inventory.
+
+**When working on this project:**
+- If suggesting improvements or finding bugs, remember the GitHub repository location
+- Security is paramount - see SECURITY.md for guidelines
+- All contributions should follow CONTRIBUTING.md guidelines
+- Use the pre-push git hook to prevent accidental exposure of sensitive data
+
 ## Overview
 You are assisting with a comprehensive homelab infrastructure that includes multiple servers, network devices, containers, and automation tools. You have access to specialized MCP (Model Context Protocol) servers that provide real-time access to all infrastructure components.
 
@@ -201,12 +217,23 @@ You are assisting with a comprehensive homelab infrastructure that includes mult
 5. Update documentation
 ```
 
+### Contributing to the Project
+```
+1. Review CONTRIBUTING.md and SECURITY.md on GitHub
+2. Fork the repository at https://github.com/bjeans/homelab-mcp
+3. Make changes following the coding standards
+4. Test thoroughly with real infrastructure
+5. Run pre_publish_check.py to verify no sensitive data
+6. Submit pull request with clear description
+```
+
 ## Security Reminders
 
 - **Never expose sensitive information** in responses
 - **API keys and passwords** are in environment variables only
 - **IP addresses** in this file are your private infrastructure
 - **This file contains your network topology** - treat as confidential
+- **Project is open-source** - Never suggest code changes that include real credentials or IPs
 
 ## Remember
 - You have **7 powerful MCP servers** at your disposal
@@ -214,5 +241,7 @@ You are assisting with a comprehensive homelab infrastructure that includes mult
 - Infrastructure state is **live and real-time**
 - **Ansible inventory** is the authoritative source
 - When in doubt, **query the relevant MCP** rather than guessing
+- **This project is published on GitHub** at https://github.com/bjeans/homelab-mcp
+- If you find bugs or have suggestions, remember the GitHub repository for issues/PRs
 
 This homelab is production-grade with redundancy, monitoring, and automation. Treat it as a professional infrastructure and always verify changes with the appropriate MCP tools.

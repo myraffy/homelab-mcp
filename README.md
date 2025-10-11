@@ -1,5 +1,14 @@
 # Homelab MCP Servers
 
+# Homelab MCP
+
+[![GitHub release](https://img.shields.io/github/v/release/bjeans/homelab-mcp)](https://github.com/bjeans/homelab-mcp/releases)
+[![Security Check](https://github.com/bjeans/homelab-mcp/actions/workflows/security-check.yml/badge.svg)](https://github.com/bjeans/homelab-mcp/actions/workflows/security-check.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/bjeans/homelab-mcp/blob/main/LICENSE)
+![Python](https://img.shields.io/badge/python-3.9+-blue.svg)
+
+Model Context Protocol (MCP) servers for managing homelab infrastructure through Claude Desktop.
+
 A collection of Model Context Protocol (MCP) servers for managing and monitoring your homelab infrastructure through Claude Desktop.
 
 ## 🔒 Security Notice
