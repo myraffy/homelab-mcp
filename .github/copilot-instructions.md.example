@@ -1,5 +1,14 @@
 # Homelab Infrastructure - AI Agent Instructions
 
+## Project Metadata
+**Project:** Homelab MCP Servers  
+**Repository:** https://github.com/bjeans/homelab-mcp  
+**Version:** 1.0.0 (Released: 2025-10-11)  
+**License:** MIT  
+**Documentation:** README.md, SECURITY.md, CONTRIBUTING.md in repository
+
+**About:** Open-source MCP server collection for managing homelab infrastructure through Claude Desktop. Provides real-time monitoring of Docker/Podman, Ollama AI, Pi-hole DNS, Unifi networks, and Ansible inventory.
+
 ## Project Context
 This is a homelab MCP (Model Context Protocol) server collection providing real-time infrastructure monitoring and management for Claude Desktop. **Key insight**: This is production infrastructure with specialized MCP servers monitoring hosts across multiple services.
 
@@ -37,7 +46,9 @@ This is a homelab MCP (Model Context Protocol) server collection providing real-
 ### Essential Files
 - `.env.example` - Configuration template (safe to commit)
 - `requirements.txt` - Python dependencies
-- `PROJECT_INSTRUCTIONS.md` - Detailed usage guide
+- `PROJECT_INSTRUCTIONS.md` - Detailed usage guide (gitignored)
+- `LICENSE` - MIT License
+- `CHANGELOG.md` - Version history
 
 ## Development Standards
 
@@ -95,6 +106,33 @@ read_mcp_file("docker_mcp_podman.py")
 write_mcp_file("new_server.py", content)
 ```
 
+### Contributing to Project
+1. Review CONTRIBUTING.md and SECURITY.md on GitHub
+2. Fork repository at https://github.com/bjeans/homelab-mcp
+3. Follow coding standards and security guidelines
+4. Test thoroughly with real infrastructure
+5. Run `pre_publish_check.py` before committing
+6. Submit PR with clear description
+
+## Security Guidelines
+
+### Critical Security Rules
+- **Never commit** `.env`, `ansible_hosts.yml`, or `PROJECT_INSTRUCTIONS.md`
+- **Always use** environment variables for API keys and passwords
+- **Run** `pre_publish_check.py` before every git push
+- **Install** git pre-push hook: `python install_git_hook.py`
+- See SECURITY.md for comprehensive security guidelines
+
+### Git Pre-Push Hook
+Automatically runs security checks before every push:
+```bash
+# Install once
+python install_git_hook.py
+
+# Bypass only in emergencies
+git push --no-verify
+```
+
 ## Critical Gotchas
 
 ### Windows Environment
@@ -114,9 +152,22 @@ write_mcp_file("new_server.py", content)
 - Use Ansible inventory, not hardcoded values
 - Test changes carefully - this affects real infrastructure
 
+### Open Source Project
+- **Never include** real IP addresses, hostnames, or credentials in code
+- Use generic examples (192.168.1.x, server1, server2)
+- All example files must use `.example` suffix
+- Remember: code is public at https://github.com/bjeans/homelab-mcp
+
 ## File Patterns
 - MCP servers: `{service}_mcp.py` or `{service}_mcp_{variant}.py`  
 - Config templates: `.example` suffix (safe to commit)
-- Archives: `archive-ignore/` directory
+- Archives: `archive-ignore/` directory (gitignored)
+- Real configs: `.env`, `ansible_hosts.yml`, `PROJECT_INSTRUCTIONS.md` (gitignored)
 
 **Dependencies**: `mcp`, `aiohttp`, `pyyaml`, `requests` (see `requirements.txt`)
+
+## Project Links
+- **Repository:** https://github.com/bjeans/homelab-mcp
+- **Issues:** https://github.com/bjeans/homelab-mcp/issues
+- **Discussions:** https://github.com/bjeans/homelab-mcp/discussions
+- **Security:** See SECURITY.md for vulnerability reporting
