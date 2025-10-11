@@ -4,7 +4,9 @@ Install Git Pre-Push Hook
 Automatically runs security checks before every git push
 
 Usage:
-  python install_git_hook.py
+  python helpers/install_git_hook.py (from project root)
+  OR
+  python install_git_hook.py (from helpers directory)
 
 To bypass security checks on a specific push:
   git push --no-verify
@@ -19,21 +21,41 @@ import sys
 from pathlib import Path
 
 
+def find_git_root():
+    """Find the git repository root by traversing up the directory tree"""
+    current = Path.cwd()
+    
+    # Check if we're already at git root
+    if (current / ".git").exists():
+        return current
+    
+    # Traverse up to find git root
+    for parent in current.parents:
+        if (parent / ".git").exists():
+            return parent
+    
+    return None
+
+
 def main():
     """Install the pre-push git hook"""
     
-    # Find git directory
-    git_dir = Path(".git")
-    if not git_dir.exists():
-        print("❌ Error: Not a git repository")
-        print("   Run this script from the repository root")
+    # Find git repository root
+    repo_root = find_git_root()
+    if not repo_root:
+        print("❌ Error: Not in a git repository")
+        print("   Make sure you're in the repository or a subdirectory")
         sys.exit(1)
     
-    # Verify pre_publish_check.py exists
-    check_script = Path("pre_publish_check.py")
+    print(f"📁 Found git repository at: {repo_root}")
+    
+    git_dir = repo_root / ".git"
+    
+    # Verify pre_publish_check.py exists in helpers directory
+    check_script = repo_root / "helpers" / "pre_publish_check.py"
     if not check_script.exists():
-        print("❌ Error: pre_publish_check.py not found")
-        print("   Make sure you're in the correct directory")
+        print(f"❌ Error: pre_publish_check.py not found at {check_script}")
+        print("   Make sure pre_publish_check.py exists in the helpers directory")
         sys.exit(1)
     
     # Create hooks directory if it doesn't exist
@@ -52,11 +74,11 @@ def main():
             sys.exit(0)
         print()
     
-    # Hook script content
+    # Hook script content - updated to look for pre_publish_check.py in helpers/
     hook_content = '''#!/usr/bin/env python3
 """
 Git pre-push hook - Runs security checks before allowing push
-Installed by install_git_hook.py
+Installed by helpers/install_git_hook.py
 """
 
 import sys
@@ -64,19 +86,21 @@ import subprocess
 import os
 from pathlib import Path
 
+def find_repo_root():
+    """Find repository root from hook location"""
+    # Hook is at .git/hooks/pre-push, so repo root is 2 levels up
+    hook_file = Path(__file__)
+    return hook_file.parent.parent.parent
+
 def main():
     """Run pre-publish check before push"""
-    # Get the repository root (two levels up from .git/hooks/)
-    hook_dir = Path(__file__).parent
-    git_dir = hook_dir.parent
-    repo_root = git_dir.parent
-    
-    check_script = repo_root / "pre_publish_check.py"
+    repo_root = find_repo_root()
+    check_script = repo_root / "helpers" / "pre_publish_check.py"
     
     if not check_script.exists():
         print(f"Warning: pre_publish_check.py not found at {check_script}")
         print("Skipping security check")
-        print("Run: python install_git_hook.py to reinstall")
+        print("Run: python helpers/install_git_hook.py to reinstall")
         sys.exit(0)
     
     print("🔒 Running security checks before push...")
@@ -135,9 +159,12 @@ if __name__ == "__main__":
     print("=" * 70)
     print()
     print("What this does:")
-    print("  • Runs pre_publish_check.py before every git push")
+    print("  • Runs helpers/pre_publish_check.py before every git push")
     print("  • Blocks push if security issues are found")
     print("  • Protects against accidentally pushing sensitive data")
+    print()
+    print("Usage from anywhere in the repo:")
+    print("  python helpers/install_git_hook.py")
     print()
     print("To bypass on a specific push (use with caution):")
     print("  git push --no-verify")
@@ -146,7 +173,7 @@ if __name__ == "__main__":
     print(f"  Remove: {hook_file}")
     print()
     print("Test it now:")
-    print("  python pre_publish_check.py")
+    print("  python helpers/pre_publish_check.py")
     print()
 
 if __name__ == "__main__":

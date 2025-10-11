@@ -1,0 +1,27 @@
+# Development and Testing Dependencies
+# Install with: pip install -r requirements-dev.txt
+
+# Linting and Code Quality
+flake8>=7.0.0           # Python linting
+pylint>=3.0.0           # Comprehensive Python linter
+black>=24.0.0           # Code formatter
+isort>=5.13.0           # Import sorter
+mypy>=1.8.0             # Static type checker
+
+
+# Security
+bandit>=1.7.0           # Security issue scanner
+safety>=3.0.0           # Dependency vulnerability scanner
+pip-audit>=2.6.0        # Audit Python packages for known vulnerabilities
+
+# Testing (for future unit tests)
+pytest>=8.0.0           # Testing framework
+pytest-asyncio>=0.23.0  # Async test support
+pytest-cov>=4.1.0       # Coverage reporting
+pytest-mock>=3.12.0     # Mocking support
+
+# Documentation
+pydocstyle>=6.3.0       # Docstring style checker
+
+# YAML validation
+yamllint>=1.35.0        # YAML linter

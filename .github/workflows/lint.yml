@@ -1,0 +1,72 @@
+name: Python Linting and Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8 pylint black isort mypy bandit
+        
+    - name: Run Black (code formatting check)
+      run: |
+        echo "Checking code formatting with Black..."
+        black --check --diff *.py || echo "::warning::Black formatting issues found"
+      continue-on-error: true
+      
+    - name: Run isort (import sorting check)
+      run: |
+        echo "Checking import sorting with isort..."
+        isort --check-only --diff *.py || echo "::warning::Import sorting issues found"
+      continue-on-error: true
+      
+    # - name: Run Flake8 (style guide enforcement)
+    #   run: |
+    #     echo "Running Flake8 linting..."
+    #     # Ignore some common issues that don't affect functionality
+    #     flake8 *.py --count --select=E9,F63,F7,F82 --show-source --statistics
+    #     # Show all issues as warnings
+    #     flake8 *.py --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+    - name: Run Pylint (comprehensive linting)
+      run: |
+        echo "Running Pylint..."
+        # Run pylint but don't fail the build, just show results
+        pylint *.py --exit-zero --max-line-length=127 || true
+      continue-on-error: true
+      
+    - name: Run Bandit (security linting)
+      run: |
+        echo "Running Bandit security checks..."
+        bandit -r *.py -f json -o bandit-report.json || true
+        bandit -r *.py || true
+      continue-on-error: true
+      
+    - name: Run MyPy (type checking)
+      run: |
+        echo "Running MyPy type checking..."
+        mypy *.py --ignore-missing-imports --no-strict-optional --python-version 3.13|| true
+      continue-on-error: true
+      
+    - name: Summary
+      if: success()
+      run: |
+        echo "✅ Linting and code quality checks completed!"
+        echo "Review warnings above for potential improvements."

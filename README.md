@@ -3,7 +3,7 @@
 [![GitHub release](https://img.shields.io/github/v/release/bjeans/homelab-mcp)](https://github.com/bjeans/homelab-mcp/releases)
 [![Security Check](https://github.com/bjeans/homelab-mcp/actions/workflows/security-check.yml/badge.svg)](https://github.com/bjeans/homelab-mcp/actions/workflows/security-check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/bjeans/homelab-mcp/blob/main/LICENSE)
-![Python](https://img.shields.io/badge/python-3.9+-blue.svg)
+![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
 
 Model Context Protocol (MCP) servers for managing homelab infrastructure through Claude Desktop.
 
@@ -64,7 +64,13 @@ git clone https://github.com/bjeans/homelab-mcp
 cd homelab-mcp
 ```
 
-### 2. Set up configuration files
+### 2. Install security checks (recommended)
+```bash
+# Install pre-push git hook for automatic security validation
+python helpers/install_git_hook.py
+```
+
+### 3. Set up configuration files
 
 **Environment variables:**
 ```bash
@@ -106,12 +112,12 @@ cp PROJECT_INSTRUCTIONS.example.md PROJECT_INSTRUCTIONS.md
 
 Customize with your network topology and servers.
 
-### 3. Install Python dependencies
+### 4. Install Python dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Add to Claude Desktop config
+### 5. Add to Claude Desktop config
 
 **Config file location:**
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
@@ -150,9 +156,9 @@ pip install -r requirements.txt
 }
 ```
 
-### 5. Restart Claude Desktop
+### 6. Restart Claude Desktop
 
-### 6. Add project instructions to Claude
+### 7. Add project instructions to Claude
 - Copy the contents of your customized `PROJECT_INSTRUCTIONS.md` 
 - Paste into your Claude project's "Project instructions" field
 - This gives Claude comprehensive context about your MCP capabilities
@@ -298,6 +304,33 @@ ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
 
 ## 🔒 Security
 
+### Automated Security Checks
+
+This project includes automated security validation to prevent accidental exposure of sensitive data:
+
+**Install the pre-push git hook (recommended):**
+```bash
+# From project root
+python helpers/install_git_hook.py
+```
+
+**What it does:**
+- Automatically runs `helpers/pre_publish_check.py` before every git push
+- Blocks pushes that contain potential secrets or sensitive data
+- Protects against accidentally committing API keys, passwords, or personal information
+
+**Manual security check:**
+```bash
+# Run security validation manually
+python helpers/pre_publish_check.py
+```
+
+**Bypass security check (use with extreme caution):**
+```bash
+# Only when absolutely necessary
+git push --no-verify
+```
+
 ### Critical Security Practices
 
 **Configuration Files:**
@@ -325,7 +358,7 @@ ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
 ## 📋 Requirements
 
 ### System Requirements
-- **Python**: 3.9 or higher
+- **Python**: 3.10 or higher
 - **Claude Desktop**: Latest version recommended
 - **Network Access**: Connectivity to homelab services
 
@@ -369,9 +402,42 @@ Core dependencies:
 
 ## 🛠️ Development
 
+### Getting Started
+
+1. **Install security git hook (required for contributors):**
+   ```bash
+   python helpers/install_git_hook.py
+   ```
+
+2. **Set up development environment:**
+   ```bash
+   pip install -r requirements.txt
+   cp .env.example .env
+   # Edit .env with your test values
+   ```
+
+### Helper Scripts
+
+The `helpers/` directory contains utility scripts for development and deployment:
+
+- **`install_git_hook.py`** - Installs git pre-push hook for automatic security checks
+- **`pre_publish_check.py`** - Security validation script (runs automatically via git hook)
+
+**Usage:**
+```bash
+# Install security git hook
+python helpers/install_git_hook.py
+
+# Run security check manually  
+python helpers/pre_publish_check.py
+```
+
 ### Project Structure
 ```
 Homelab-MCP/
+├── helpers/                 # Utility and setup scripts
+│   ├── install_git_hook.py # Git pre-push hook installer
+│   └── pre_publish_check.py # Security validation script
 ├── .env.example              # Template for environment variables
 ├── .gitignore               # Excludes sensitive files
 ├── SECURITY.md              # Security best practices
@@ -379,7 +445,6 @@ Homelab-MCP/
 ├── requirements.txt         # Python dependencies
 ├── ansible_hosts.example.yml    # Example Ansible inventory
 ├── PROJECT_INSTRUCTIONS.example.md  # Example Claude instructions
-├── pre_publish_check.py     # Security checker script
 ├── ansible_mcp_server.py    # Ansible inventory MCP
 ├── docker_mcp_podman.py     # Docker/Podman MCP
 ├── ollama_mcp.py            # Ollama AI MCP
@@ -438,7 +503,7 @@ All MCP servers support two configuration methods:
 
 ### Coding Standards
 
-- **Python 3.9+** syntax and features
+- **Python 3.10+** syntax and features
 - **Async/await** for all I/O operations
 - **Type hints** where beneficial
 - **Error handling** for network operations
@@ -448,6 +513,8 @@ All MCP servers support two configuration methods:
 ### Testing Checklist
 
 Before committing changes:
+- [ ] Security git hook installed (`python helpers/install_git_hook.py`)
+- [ ] Manual security check passes (`python helpers/pre_publish_check.py`)
 - [ ] No sensitive data in code or commits
 - [ ] Environment variables for all configuration
 - [ ] Error handling for network failures
@@ -544,11 +611,12 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for det
 
 ### Quick Start for Contributors
 
-1. **Review security guidelines** in [SECURITY.md](SECURITY.md)
-2. **No sensitive data** in commits
-3. **All configuration** uses environment variables or Ansible
-4. **Update documentation** for any changes
-5. **Test thoroughly** with real infrastructure
+1. **Install security git hook** (`python helpers/install_git_hook.py`)
+2. **Review security guidelines** in [SECURITY.md](SECURITY.md)
+3. **No sensitive data** in commits (hook will block automatically)
+4. **All configuration** uses environment variables or Ansible
+5. **Update documentation** for any changes
+6. **Test thoroughly** with real infrastructure
 
 ### Pull Request Process
 

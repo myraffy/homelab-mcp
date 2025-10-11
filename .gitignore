@@ -36,7 +36,7 @@ desktop.ini
 
 # Unifi export cache
 unifi_export/
-*.json
+# *.json
 
 # Logs
 *.log

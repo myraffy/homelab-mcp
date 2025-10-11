@@ -105,7 +105,7 @@ python docker_mcp_podman.py
 
 ### Code Style
 
-- **Python 3.9+** features
+- **Python 3.10+** features
 - **Async/await** for I/O operations
 - **Type hints** where beneficial
 - **Error handling** for network operations

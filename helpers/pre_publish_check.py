@@ -9,6 +9,9 @@ import re
 import sys
 from pathlib import Path
 
+# Define script_dir once at module level
+script_dir = Path(__file__).parent.parent
+
 # Colors for output
 GREEN = '\033[92m'
 RED = '\033[91m'
@@ -68,7 +71,6 @@ def check_sensitive_files():
     """Check for sensitive files that shouldn't be committed"""
     print_header("Checking for Sensitive Files")
     
-    script_dir = Path(__file__).parent
     issues = []
     
     # Read .gitignore
@@ -132,7 +134,6 @@ def check_documentation_files():
     """Check that documentation files exist"""
     print_header("Checking Documentation Files")
     
-    script_dir = Path(__file__).parent
     issues = []
     
     required_docs = {
@@ -158,7 +159,6 @@ def scan_python_files():
     """Scan Python files for potential issues"""
     print_header("Scanning Python Files for Sensitive Data")
     
-    script_dir = Path(__file__).parent
     issues = []
     
     python_files = list(script_dir.glob('*.py'))
@@ -200,7 +200,6 @@ def scan_markdown_files():
     """Scan markdown files for real infrastructure details"""
     print_header("Scanning Markdown Files for Infrastructure Details")
     
-    script_dir = Path(__file__).parent
     issues = []
     
     # Files to check (excluding the customized versions)
@@ -275,7 +274,6 @@ def main():
     print(f"{BOLD}Homelab MCP - Pre-Publication Security Check{RESET}")
     print(f"{BOLD}{'='*70}{RESET}")
     
-    script_dir = Path(__file__).parent
     print(f"Checking directory: {script_dir}\n")
     
     all_passed = True
