@@ -6,22 +6,23 @@ Reads host configuration from Ansible inventory
 """
 
 import asyncio
-import aiohttp
 import json
-import sys
 import logging
 import os
-import yaml
+import sys
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Dict, Optional
+
+import aiohttp
+import yaml
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
-from mcp.server.models import InitializationOptions
+import mcp.server.stdio
 import mcp.types as types
 from mcp.server import NotificationOptions, Server
-import mcp.server.stdio
+from mcp.server.models import InitializationOptions
 
 server = Server("docker-info")
 

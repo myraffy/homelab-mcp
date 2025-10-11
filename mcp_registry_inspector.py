@@ -6,13 +6,13 @@ This MCP server allows querying Claude Desktop's MCP configuration
 and inspecting the MCP server directory contents.
 """
 
+import asyncio
 import json
+import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any
-import asyncio
-import logging
-import sys
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)

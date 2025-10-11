@@ -6,14 +6,15 @@ Works with Unifi Network Application 9.x and API keys
 Windows-compatible version
 """
 
-import json
-import yaml
 import argparse
-import requests
+import json
+import sys
 from datetime import datetime
 from pathlib import Path
+
+import requests
 import urllib3
-import sys
+import yaml
 
 # Disable SSL warnings for self-signed certificates
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

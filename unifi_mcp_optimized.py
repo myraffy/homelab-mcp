@@ -6,23 +6,23 @@ Separates infrastructure (devices) from clients for faster queries
 """
 
 import asyncio
-import subprocess
+import glob
 import json
-import sys
 import logging
 import os
+import subprocess
+import sys
 import tempfile
-import glob
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
-from mcp.server.models import InitializationOptions
+import mcp.server.stdio
 import mcp.types as types
 from mcp.server import NotificationOptions, Server
-import mcp.server.stdio
+from mcp.server.models import InitializationOptions
 
 server = Server("unifi-network")
 

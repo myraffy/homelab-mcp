@@ -7,10 +7,11 @@ Provides read-only access to Ansible inventory information via MCP protocol
 import asyncio
 import json
 import os
-import yaml
 from pathlib import Path
 from typing import Any, Optional
+
 import mcp.types as types
+import yaml
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
@@ -367,7 +368,7 @@ class AnsibleInventoryMCP:
 async def main():
     """Main entry point for the MCP server"""
     import os
-    
+
     # Allow override via environment variable
     inventory_path = os.getenv('ANSIBLE_INVENTORY_PATH', DEFAULT_INVENTORY_PATH)
     

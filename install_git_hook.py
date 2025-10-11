@@ -14,9 +14,10 @@ To uninstall:
 """
 
 import os
+import shutil
 import sys
 from pathlib import Path
-import shutil
+
 
 def main():
     """Install the pre-push git hook"""
