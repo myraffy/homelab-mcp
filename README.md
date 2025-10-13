@@ -223,29 +223,97 @@ PODMAN_SERVER1_ENDPOINT=192.168.1.102:8080
 ```
 
 ### Ollama AI Model Manager
-Monitor and manage Ollama AI model instances and LiteLLM proxy.
+
+Monitor and manage Ollama AI model instances across your homelab, plus check your LiteLLM proxy for unified API access.
+
+#### What's Included
+
+**Ollama Monitoring:**
+- Track multiple Ollama instances across different hosts
+- View available models and their sizes
+- Check instance health and availability
+
+**LiteLLM Proxy Integration:**
+- LiteLLM provides a unified OpenAI-compatible API across all your Ollama instances
+- Enables load balancing and failover between multiple Ollama servers
+- Allows you to use OpenAI client libraries with your local models
+- The MCP server can verify your LiteLLM proxy is online and responding
+
+**Why use LiteLLM?**
+- **Load Balancing**: Automatically distributes requests across multiple Ollama instances
+- **Failover**: If one Ollama server is down, requests route to healthy servers
+- **OpenAI Compatibility**: Use any OpenAI SDK/library with your local models
+- **Centralized Access**: Single endpoint (e.g., `http://10.0.1.232:4000`) for all models
+- **Usage Tracking**: Monitor which models are being used most
 
 **Tools:**
-- `get_ollama_status` - Check status of all Ollama instances
-- `get_ollama_models` - Get models on a specific host
-- `get_litellm_status` - Check LiteLLM proxy status
+- `get_ollama_status` - Check status of all Ollama instances and model counts
+- `get_ollama_models` - Get detailed model list for a specific host
+- `get_litellm_status` - Verify LiteLLM proxy is online and responding
 
 **Configuration Options:**
 
 *Option 1: Using Ansible Inventory (Recommended)*
 ```bash
 ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
-OLLAMA_PORT=11434  # Default port
+OLLAMA_PORT=11434  # Default Ollama port
+
+# LiteLLM Configuration
+LITELLM_HOST=192.168.1.100  # Host running LiteLLM proxy
+LITELLM_PORT=4000           # LiteLLM proxy port (default: 4000)
 ```
 
 *Option 2: Using Environment Variables*
 ```bash
+# Ollama Instances
 OLLAMA_SERVER1=192.168.1.100
 OLLAMA_SERVER2=192.168.1.101
 OLLAMA_WORKSTATION=192.168.1.150
+
+# LiteLLM Proxy
 LITELLM_HOST=192.168.1.100
 LITELLM_PORT=4000
 ```
+
+**Setting Up LiteLLM (Optional):**
+
+If you want to use LiteLLM for unified access to your Ollama instances:
+
+1. **Install LiteLLM** on one of your servers:
+   ```bash
+   pip install litellm[proxy]
+   ```
+
+2. **Create configuration** (`litellm_config.yaml`):
+   ```yaml
+   model_list:
+     - model_name: llama3.2
+       litellm_params:
+         model: ollama/llama3.2
+         api_base: http://server1:11434
+     - model_name: llama3.2
+       litellm_params:
+         model: ollama/llama3.2
+         api_base: http://server2:11434
+   
+   router_settings:
+     routing_strategy: usage-based-routing
+   ```
+
+3. **Start LiteLLM proxy**:
+   ```bash
+   litellm --config litellm_config.yaml --port 4000
+   ```
+
+4. **Use the MCP tool** to verify it's running:
+   - In Claude: "Check my LiteLLM proxy status"
+
+**Example Usage:**
+- "What Ollama instances do I have running?"
+- "Show me all models on my Dell-Server"
+- "Is my LiteLLM proxy online?"
+- "How many models are available across all servers?"
+
 
 ### Pi-hole DNS Manager
 Monitor Pi-hole DNS statistics and status.
