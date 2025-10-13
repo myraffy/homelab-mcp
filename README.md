@@ -23,7 +23,22 @@ This project interacts with critical infrastructure (Docker APIs, DNS, network d
 
 See [SECURITY.md](SECURITY.md) for comprehensive security guidance.
 
-## 📖 Important: Configure Claude Project Instructions
+## � Documentation Overview
+
+This project includes several documentation files for different audiences:
+
+- **[README.md](README.md)** (this file) - Installation, setup, and usage guide
+- **[PROJECT_INSTRUCTIONS.md](PROJECT_INSTRUCTIONS.md)** - Copy into Claude project instructions for AI context
+- **[CLAUDE.md](CLAUDE.md)** - Developer guide for AI assistants and contributors
+- **[SECURITY.md](SECURITY.md)** - Security policies and best practices  
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute to this project
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+
+**👥 For End Users:** Follow this README + copy PROJECT_INSTRUCTIONS.md to Claude  
+**🤖 For AI Assistants:** Read CLAUDE.md for complete development context  
+**🔧 For Contributors:** Start with CONTRIBUTING.md and CLAUDE.md
+
+## �📖 Important: Configure Claude Project Instructions
 
 After setting up the MCP servers, **create your personalized project instructions**:
 
@@ -402,6 +417,8 @@ Core dependencies:
 
 ## 🛠️ Development
 
+**📖 First time contributing?** Read [CLAUDE.md](CLAUDE.md) for complete development guidance including architecture patterns, security requirements, and AI assistant workflows.
+
 ### Getting Started
 
 1. **Install security git hook (required for contributors):**
@@ -442,6 +459,9 @@ Homelab-MCP/
 ├── .gitignore               # Excludes sensitive files
 ├── SECURITY.md              # Security best practices
 ├── README.md                # This file
+├── CLAUDE.md                # Developer & AI assistant guide
+├── CONTRIBUTING.md          # Contribution guidelines
+├── CHANGELOG.md             # Version history
 ├── requirements.txt         # Python dependencies
 ├── ansible_hosts.example.yml    # Example Ansible inventory
 ├── PROJECT_INSTRUCTIONS.example.md  # Example Claude instructions
@@ -478,6 +498,7 @@ Homelab-MCP/
 3. **Update documentation**
    - Add server details to this README
    - Update `PROJECT_INSTRUCTIONS.example.md`
+   - Update `CLAUDE.md` if adding new patterns or capabilities
    - Add security notes if applicable
 
 4. **Test thoroughly**
@@ -608,6 +629,13 @@ Copyright (c) 2025 Barnaby Jeans
 ## 🤝 Contributing
 
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+### For AI Assistants & Developers
+**📖 Read [CLAUDE.md](CLAUDE.md) first** - This file contains:
+- Complete project architecture and development patterns
+- Security requirements and common pitfalls to avoid
+- Specific workflows for adding features and fixing bugs
+- AI assistant-specific guidance for working with this codebase
 
 ### Quick Start for Contributors
 
