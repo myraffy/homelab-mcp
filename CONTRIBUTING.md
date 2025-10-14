@@ -100,8 +100,9 @@ python docker_mcp_podman.py
 3. Add configuration to `.env.example`
 4. Update `README.md` with server documentation
 5. Update `PROJECT_INSTRUCTIONS.example.md`
-6. Add security notes if the service uses API keys
-7. Test thoroughly
+6. Update `CLAUDE.example.md` if adding AI development context
+7. Add security notes if the service uses API keys
+8. Test thoroughly
 
 ### Code Style
 

@@ -52,20 +52,35 @@ def scan_for_ips(content, filename):
     return real_ips
 
 def scan_for_api_keys(content, filename):
-    """Scan content for potential API keys"""
-    # Common patterns for API keys
+    """Scan content for potential API keys and sensitive data"""
+    # Common patterns for API keys and sensitive data
     patterns = [
         r'api[_-]?key["\']?\s*[:=]\s*["\']([a-zA-Z0-9]{20,})["\']',
         r'token["\']?\s*[:=]\s*["\']([a-zA-Z0-9]{20,})["\']',
         r'password["\']?\s*[:=]\s*["\']([^"\']{8,})["\']',
+        r'secret["\']?\s*[:=]\s*["\']([a-zA-Z0-9]{16,})["\']',
+        r'auth["\']?\s*[:=]\s*["\']([a-zA-Z0-9]{16,})["\']',
+        # GitHub URLs with actual usernames
+        r'https://github\.com/([a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+)',
+        # Notion URLs with actual IDs
+        r'https://www\.notion\.so/([a-zA-Z0-9]{32})',
+        # Email addresses
+        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
     ]
     
-    found_keys = []
+    found_items = []
     for pattern in patterns:
         matches = re.findall(pattern, content, re.IGNORECASE)
-        found_keys.extend(matches)
+        for match in matches:
+            # Skip common example patterns
+            if any(example in match.lower() for example in [
+                'example.com', 'your-username', 'your-api-key', 
+                'placeholder', 'template', 'sample', 'demo'
+            ]):
+                continue
+            found_items.append(match)
     
-    return found_keys
+    return found_items
 
 def check_sensitive_files():
     """Check for sensitive files that shouldn't be committed"""
@@ -86,7 +101,8 @@ def check_sensitive_files():
     required_ignored = [
         '.env',
         'PROJECT_INSTRUCTIONS.md',
-        'ansible_hosts.yml'
+        'ansible_hosts.yml',
+        'CLAUDE.md'
     ]
     
     for filename in required_ignored:
@@ -100,7 +116,8 @@ def check_sensitive_files():
     sensitive_files = [
         ('.env', '.env should exist but not be committed'),
         ('PROJECT_INSTRUCTIONS.md', 'Your customized instructions (not the .example)'),
-        ('ansible_hosts.yml', 'Your real inventory (not the .example)')
+        ('ansible_hosts.yml', 'Your real inventory (not the .example)'),
+        ('CLAUDE.md', 'Your customized Claude guide (not the .example)')
     ]
     
     print()
@@ -118,7 +135,8 @@ def check_sensitive_files():
     example_files = [
         '.env.example',
         'PROJECT_INSTRUCTIONS.example.md',
-        'ansible_hosts.example.yml'
+        'ansible_hosts.example.yml',
+        'CLAUDE.example.md'
     ]
     
     for filename in example_files:
@@ -142,7 +160,8 @@ def check_documentation_files():
         '.env.example': 'Environment variables template',
         'requirements.txt': 'Python dependencies',
         'PROJECT_INSTRUCTIONS.example.md': 'Claude instructions template',
-        'ansible_hosts.example.yml': 'Ansible inventory template'
+        'ansible_hosts.example.yml': 'Ansible inventory template',
+        'CLAUDE.example.md': 'Claude AI development guide template'
     }
     
     for filename, description in required_docs.items():
@@ -196,6 +215,61 @@ def scan_python_files():
     
     return len(issues) == 0
 
+def check_claude_md():
+    """Special check for CLAUDE.md if it exists (should be gitignored)"""
+    print_header("Checking CLAUDE.md for Private Information")
+    
+    issues = []
+    claude_md = script_dir / 'CLAUDE.md'
+    
+    if not claude_md.exists():
+        print_success("CLAUDE.md does not exist (good for public repo)")
+        return True
+    
+    # If it exists, check if it's gitignored
+    gitignore_path = script_dir / '.gitignore'
+    if gitignore_path.exists():
+        with open(gitignore_path, 'r') as f:
+            gitignore_content = f.read()
+        
+        if 'CLAUDE.md' not in gitignore_content:
+            print_error("CLAUDE.md exists but is NOT in .gitignore!")
+            issues.append("CLAUDE.md must be added to .gitignore")
+        else:
+            print_success("CLAUDE.md is properly gitignored")
+    
+    # If CLAUDE.md exists, scan it for private information
+    try:
+        with open(claude_md, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Check for real URLs
+        github_urls = re.findall(r'https://github\.com/([a-zA-Z0-9_-]+)', content)
+        notion_urls = re.findall(r'https://www\.notion\.so/([a-zA-Z0-9]{32})', content)
+        
+        if github_urls:
+            real_github = [url for url in github_urls if url not in ['your-username', 'example-user']]
+            if real_github:
+                print_warning(f"CLAUDE.md contains real GitHub URLs: {', '.join(real_github)}")
+        
+        if notion_urls:
+            print_warning(f"CLAUDE.md contains Notion URLs (likely private)")
+        
+        # Check for private IPs
+        ips = scan_for_ips(content, 'CLAUDE.md')
+        if ips:
+            print_warning(f"CLAUDE.md contains IP addresses: {', '.join(ips)}")
+        
+        # Check for other sensitive data
+        sensitive = scan_for_api_keys(content, 'CLAUDE.md')
+        if sensitive:
+            print_warning(f"CLAUDE.md may contain sensitive information")
+            
+    except Exception as e:
+        print_error(f"Error scanning CLAUDE.md: {e}")
+    
+    return len(issues) == 0
+
 def scan_markdown_files():
     """Scan markdown files for real infrastructure details"""
     print_header("Scanning Markdown Files for Infrastructure Details")
@@ -207,7 +281,8 @@ def scan_markdown_files():
         'README.md',
         'SECURITY.md',
         'PROJECT_INSTRUCTIONS.example.md',
-        'ansible_hosts.example.yml'
+        'ansible_hosts.example.yml',
+        'CLAUDE.example.md'
     ]
     
     for filename in md_files:
@@ -256,7 +331,8 @@ def final_reminders():
         "Ensure .env is NOT in git history (git rm --cached .env if needed)",
         "Test with a fresh clone in a new directory",
         "Verify .gitignore is working (git status should not show sensitive files)",
-        "Double-check that PROJECT_INSTRUCTIONS.md is gitignored",
+        "Double-check that PROJECT_INSTRUCTIONS.md and CLAUDE.md are gitignored",
+        "Verify CLAUDE.example.md exists and contains placeholder data only",
         "Review all commits for sensitive data before pushing",
         "Consider using 'git secrets' or similar tools",
         "Update GitHub repository description and tags",
@@ -283,6 +359,9 @@ def main():
         all_passed = False
     
     if not check_documentation_files():
+        all_passed = False
+    
+    if not check_claude_md():
         all_passed = False
     
     if not scan_python_files():

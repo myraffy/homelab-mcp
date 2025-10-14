@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Repository:** https://github.com/bjeans/homelab-mcp  
+**Repository:** <https://github.com/bjeans/homelab-mcp>  
 **Version:** 1.0.0 (Released: 2025-10-11)  
 **License:** MIT  
 **Purpose:** Open-source MCP servers for homelab infrastructure management through Claude Desktop
@@ -33,6 +33,7 @@ homelab-mcp/
 ├── .env.example                   # Configuration template
 ├── ansible_hosts.example.yml      # Ansible inventory example
 ├── PROJECT_INSTRUCTIONS.example.md # AI assistant guide
+├── CLAUDE.example.md              # This file (rename to CLAUDE.md)
 ├── README.md                      # User documentation
 ├── SECURITY.md                    # Security guidelines
 ├── CONTRIBUTING.md                # Contribution guide
@@ -40,6 +41,15 @@ homelab-mcp/
 ├── LICENSE                        # MIT License
 └── .gitignore                     # Git ignore rules
 ```
+
+## Setup Instructions
+
+To use this file:
+1. Copy `CLAUDE.example.md` to `CLAUDE.md`
+2. Update any personal URLs or infrastructure details with your actual values
+3. Never commit your customized `CLAUDE.md` - it's in `.gitignore` for security
+
+**Note:** This example includes the actual homelab-mcp GitHub repository URLs for reporting issues and contributing.
 
 ## Architecture Patterns
 
@@ -162,6 +172,22 @@ Before any commit:
 4. Update CHANGELOG.md with changes
 5. Consider if SECURITY.md needs updates
 
+### "Create task reminder for user"
+When user asks to remember something or track an issue:
+1. Create GitHub issues in the homelab-mcp repository for bugs or feature requests
+2. Use your preferred task management system (if configured)
+3. Include detailed content with context and steps to reproduce
+4. Add appropriate labels and assign if working on the project
+
+**Examples of reminder requests:**
+- "Remind me to reboot Server-01 to test auto-start"
+- "Add upgrading Pi-hole to my todo list"
+- "Don't forget to check that certificate renewal"
+- "Track this workflow issue"
+- "Report this bug in the homelab-mcp repository"
+
+**Always help users track important tasks** - suggest appropriate tools.
+
 ## Testing Strategy
 
 ### Manual Testing
@@ -226,14 +252,40 @@ python install_git_hook.py
 - Breaking changes noted
 - Screenshots/examples if applicable
 
+## Task Management Integration
+
+### GitHub Issues (Recommended)
+Use the homelab-mcp GitHub repository for project-related tasks:
+- **Bugs**: Report issues with MCP servers or infrastructure problems
+- **Feature Requests**: Suggest new MCP servers or enhancements
+- **Documentation**: Improvements to guides, examples, or clarity
+- **Security**: Report security concerns or improvement suggestions
+
+### Personal Task Management (Optional)
+You may also integrate with your preferred task management system for personal homelab tasks:
+- Infrastructure maintenance reminders
+- Upgrade schedules
+- Testing checklists
+- Configuration changes
+
+**Task Categories (for GitHub issues):**
+- `bug` - Something isn't working
+- `enhancement` - New feature or request  
+- `documentation` - Improvements or additions to docs
+- `security` - Security-related improvements
+- `help wanted` - Extra attention is needed
+- `good first issue` - Good for newcomers
+
 ## Links and Resources
 
-- **Repository:** https://github.com/bjeans/homelab-mcp
-- **Issues:** https://github.com/bjeans/homelab-mcp/issues
-- **Discussions:** https://github.com/bjeans/homelab-mcp/discussions
-- **Security:** https://github.com/bjeans/homelab-mcp/security/advisories
-- **MCP Docs:** https://modelcontextprotocol.io/
-- **Claude Desktop:** https://claude.ai/download
+- **Repository:** <https://github.com/bjeans/homelab-mcp>
+- **Issues:** <https://github.com/bjeans/homelab-mcp/issues>
+- **Discussions:** <https://github.com/bjeans/homelab-mcp/discussions>
+- **Security:** <https://github.com/bjeans/homelab-mcp/security/advisories>
+- **Pull Requests:** <https://github.com/bjeans/homelab-mcp/pulls>
+- **Releases:** <https://github.com/bjeans/homelab-mcp/releases>
+- **MCP Docs:** <https://modelcontextprotocol.io/>
+- **Claude Desktop:** <https://claude.ai/download>
 
 ## Quick Commands Reference
 
@@ -250,6 +302,11 @@ python {server}_mcp_server.py
 # Create example configs
 cp .env.example .env
 cp ansible_hosts.example.yml ansible_hosts.yml
+cp PROJECT_INSTRUCTIONS.example.md PROJECT_INSTRUCTIONS.md
+cp CLAUDE.example.md CLAUDE.md
+
+# Report issues or request features
+# Visit: https://github.com/bjeans/homelab-mcp/issues
 ```
 
 ## Version History

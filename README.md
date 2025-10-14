@@ -42,20 +42,30 @@ This project includes several documentation files for different audiences:
 
 After setting up the MCP servers, **create your personalized project instructions**:
 
-1. **Copy the example template:**
+1. **Copy the example templates:**
    ```bash
    # Windows
    copy PROJECT_INSTRUCTIONS.example.md PROJECT_INSTRUCTIONS.md
+   copy CLAUDE.example.md CLAUDE.md
    
    # Linux/Mac
    cp PROJECT_INSTRUCTIONS.example.md PROJECT_INSTRUCTIONS.md
+   cp CLAUDE.example.md CLAUDE.md
    ```
 
-2. **Edit `PROJECT_INSTRUCTIONS.md`** with your actual infrastructure details:
+2. **Edit both files** with your actual infrastructure details:
+
+   **PROJECT_INSTRUCTIONS.md** (for Claude Desktop project instructions):
    - Replace example IP addresses with your real network addresses
    - Add your actual server hostnames
    - Customize with your specific services and configurations
    - **Keep this file private** - it contains your network topology
+
+   **CLAUDE.md** (for AI development work - contributors only):
+   - Update repository URLs with your actual GitHub repository
+   - Add your Notion workspace URLs if using task management
+   - Customize infrastructure references
+   - **Keep this file private** - contains your specific URLs and setup
 
 3. **Add to Claude Desktop:**
    - Open Claude Desktop
@@ -126,6 +136,17 @@ cp PROJECT_INSTRUCTIONS.example.md PROJECT_INSTRUCTIONS.md
 ```
 
 Customize with your network topology and servers.
+
+**AI development guide (for contributors):**
+```bash
+# Windows
+copy CLAUDE.example.md CLAUDE.md
+
+# Linux/Mac
+cp CLAUDE.example.md CLAUDE.md
+```
+
+Update with your repository URLs, Notion workspace, and infrastructure details.
 
 ### 4. Install Python dependencies
 ```bash
@@ -527,7 +548,7 @@ Homelab-MCP/
 ├── .gitignore               # Excludes sensitive files
 ├── SECURITY.md              # Security best practices
 ├── README.md                # This file
-├── CLAUDE.md                # Developer & AI assistant guide
+├── CLAUDE.example.md        # Example AI assistant guide (copy to CLAUDE.md)
 ├── CONTRIBUTING.md          # Contribution guidelines
 ├── CHANGELOG.md             # Version history
 ├── requirements.txt         # Python dependencies
