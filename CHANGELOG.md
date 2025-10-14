@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- New Ping MCP Server (`ping_mcp_server.py`) for network connectivity testing
+- Cross-platform ICMP ping support (Windows/Linux/macOS)
+- Ansible inventory integration for ping operations
+- Concurrent group ping capability for testing multiple hosts
+- Detailed RTT and packet loss statistics in ping results
+- Four ping tools: `ping_host`, `ping_group`, `ping_all`, `list_groups`
+
 ### Planned
 - macOS and Linux testing
 - Additional MCP servers (suggestions welcome!)

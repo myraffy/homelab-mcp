@@ -31,10 +31,10 @@ This is a homelab MCP (Model Context Protocol) server collection providing real-
 - **ollama_mcp.py** - AI model tracking with LiteLLM proxy support
 - **pihole_mcp.py** - DNS filtering stats from Pi-hole instances
 - **unifi_mcp_optimized.py** - Network monitoring via Unifi controller
+- **ping_mcp_server.py** - Network connectivity testing (ICMP ping)
 
 ### Development Tools  
 - **mcp_registry_inspector.py** - **Unique capability**: Direct file read/write for MCP development
-- **n8n-mcp** - Workflow automation (Docker container)
 
 ## Configuration Patterns
 

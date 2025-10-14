@@ -406,6 +406,48 @@ Query Ansible inventory information (read-only).
 ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
 ```
 
+### Ping Network Connectivity Monitor
+Test network connectivity and host availability using ICMP ping across your infrastructure.
+
+**Why use this?**
+- Quick health checks during outages or after power events
+- Verify which hosts are reachable before querying service-specific MCPs
+- Simple troubleshooting tool to identify network issues
+- Baseline connectivity testing for your infrastructure
+
+**Tools:**
+- `ping_host` - Ping a single host by name (resolved from Ansible inventory)
+- `ping_group` - Ping all hosts in an Ansible group concurrently
+- `ping_all` - Ping all infrastructure hosts concurrently
+- `list_groups` - List available Ansible groups for ping operations
+
+**Features:**
+- ✅ **Cross-platform support** - Works on Windows, Linux, and macOS
+- ✅ **Ansible integration** - Automatically resolves hostnames/IPs from inventory
+- ✅ **Concurrent pings** - Test multiple hosts simultaneously for faster results
+- ✅ **Detailed statistics** - RTT min/avg/max, packet loss percentage
+- ✅ **Customizable** - Configure timeout and packet count
+- ✅ **No dependencies** - Uses system `ping` command (no extra libraries needed)
+
+**Configuration:**
+```bash
+ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
+# No additional API keys required!
+```
+
+**Example Usage:**
+- "Ping server1.example.local"
+- "Check connectivity to all Pi-hole servers"
+- "Ping all Ubuntu_Server hosts"
+- "Test connectivity to entire infrastructure"
+- "What groups can I ping?"
+
+**When to use:**
+- **After power outages** - Quickly identify which hosts came back online
+- **Before service checks** - Verify host is reachable before checking specific services
+- **Network troubleshooting** - Isolate connectivity issues from service issues
+- **Health monitoring** - Regular checks to ensure infrastructure availability
+
 ## 🔒 Security
 
 ### Automated Security Checks

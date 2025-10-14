@@ -26,8 +26,8 @@ homelab-mcp/
 ├── ollama_mcp_server.py           # Ollama AI model management
 ├── pihole_mcp_server.py           # Pi-hole DNS monitoring
 ├── unifi_network_mcp_server.py    # Unifi network device monitoring
+├── ping_mcp_server.py             # Network connectivity testing (ICMP ping)
 ├── mcp_registry_inspector.py      # MCP server file management
-├── n8n_mcp_server.py              # n8n workflow automation
 ├── pre_publish_check.py           # Security validation script
 ├── install_git_hook.py            # Git pre-push hook installer
 ├── .env.example                   # Configuration template

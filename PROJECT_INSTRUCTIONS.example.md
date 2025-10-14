@@ -105,19 +105,37 @@ You are assisting with a comprehensive homelab infrastructure that includes mult
 
 **When to use:** Network troubleshooting, checking device status, monitoring client connections
 
-### 6. n8n Workflow MCP (`n8n-mcp`)
-**Purpose:** Interact with n8n workflow automation platform
-**Use for:** Workflow management, automation tasks
-
-**Endpoint:** https://n8n.your-domain.com
+### 6. Ping Network Connectivity Monitor (`ping`)
+**Purpose:** Test network connectivity via ICMP ping across infrastructure
+**Use for:** Host availability checks, network troubleshooting, connectivity verification
 
 **Key Capabilities:**
-- Full n8n workflow operations (525 nodes available)
-- 263 AI-optimized tools
-- Workflow creation, validation, and execution
-- Access to templates and documentation
+- `ping_host` - Ping single host by name (resolved from Ansible inventory)
+- `ping_group` - Ping entire Ansible group concurrently
+- `ping_all` - Ping all infrastructure hosts concurrently
+- `list_groups` - List available Ansible groups for ping operations
 
-**When to use:** Creating automation workflows, integrating services, building complex automation chains
+**Features:**
+- Cross-platform support (Windows/Linux/macOS)
+- Ansible inventory integration for hostname resolution
+- Concurrent pings for fast group testing
+- Detailed RTT min/avg/max statistics
+- Packet loss percentage reporting
+- Customizable timeout and packet count
+
+**When to use:**
+- After power outages to identify which hosts are back online
+- Before querying service-specific MCPs to verify host reachability
+- Network troubleshooting to isolate connectivity vs. service issues
+- Regular health checks to ensure infrastructure availability
+- Testing network changes or VLAN configurations
+
+**Example workflows:**
+- "Ping server1 to check if it's online"
+- "Check connectivity to all Pi-hole servers"
+- "Ping all Ubuntu_Server hosts to see which are responding"
+- "Test connectivity across entire infrastructure"
+- "What groups can I ping?" (to discover available host groups)
 
 ### 7. MCP Registry Inspector (`mcp-registry-inspector`)
 **Purpose:** Self-inspection and file management for MCP development
