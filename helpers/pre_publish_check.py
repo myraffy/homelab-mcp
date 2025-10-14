@@ -8,6 +8,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Optional, Dict, List, Set
 
 # Define script_dir once at module level
 script_dir = Path(__file__).parent.parent
@@ -32,6 +33,94 @@ def print_error(text):
 
 def print_warning(text):
     print(f"{YELLOW}⚠{RESET} {text}")
+
+def load_ansible_inventory() -> Optional[Dict[str, Set[str]]]:
+    """
+    Load Ansible inventory to extract real hostnames and IP addresses.
+    Returns a dict with 'ips' and 'hostnames' sets, or None if not available.
+    """
+    try:
+        # Try to load from .env first
+        env_path = script_dir / '.env'
+        ansible_inventory_path = None
+        
+        if env_path.exists():
+            with open(env_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('ANSIBLE_INVENTORY_PATH='):
+                        ansible_inventory_path = line.split('=', 1)[1].strip().strip('"\'')
+                        break
+        
+        # If not in .env, check for default location
+        if not ansible_inventory_path:
+            default_path = script_dir / 'ansible_hosts.yml'
+            if default_path.exists():
+                ansible_inventory_path = str(default_path)
+        
+        if not ansible_inventory_path or not Path(ansible_inventory_path).exists():
+            return None
+        
+        # Parse the YAML inventory
+        import yaml
+        with open(ansible_inventory_path, 'r') as f:
+            inventory = yaml.safe_load(f)
+        
+        ips = set()
+        hostnames = set()
+        domains = set()
+        
+        def extract_host_info(data):
+            """Recursively extract IPs and hostnames from inventory structure"""
+            if isinstance(data, dict):
+                # Check for hosts
+                if 'hosts' in data:
+                    for hostname, host_data in data['hosts'].items():
+                        # Add hostname
+                        hostnames.add(hostname)
+                        
+                        # Extract domain if hostname has one
+                        if '.' in hostname:
+                            domain = '.'.join(hostname.split('.')[1:])
+                            if domain:
+                                domains.add(domain)
+                        
+                        # Extract IP addresses
+                        if isinstance(host_data, dict):
+                            if 'ansible_host' in host_data:
+                                ips.add(host_data['ansible_host'])
+                            if 'ip' in host_data:
+                                ips.add(host_data['ip'])
+                            if 'address' in host_data:
+                                ips.add(host_data['address'])
+                
+                # Recurse into children
+                if 'children' in data:
+                    for child in data['children'].values():
+                        extract_host_info(child)
+                
+                # Recurse into any other dicts
+                for value in data.values():
+                    if isinstance(value, dict):
+                        extract_host_info(value)
+        
+        # Start extraction from root
+        if inventory:
+            extract_host_info(inventory)
+        
+        return {
+            'ips': ips,
+            'hostnames': hostnames,
+            'domains': domains
+        }
+        
+    except ImportError:
+        print_warning("PyYAML not installed - skipping Ansible inventory check")
+        print_warning("Install with: pip install pyyaml")
+        return None
+    except Exception as e:
+        print_warning(f"Could not load Ansible inventory: {e}")
+        return None
 
 def check_file_exists(filepath):
     """Check if a file exists"""
@@ -322,6 +411,114 @@ def scan_markdown_files():
     
     return len(issues) == 0
 
+def scan_for_real_infrastructure(inventory_data: Optional[Dict[str, Set[str]]]):
+    """
+    Scan all code files for references to real infrastructure from Ansible inventory.
+    This is a context-aware check that knows YOUR specific hostnames and IPs.
+    """
+    if not inventory_data:
+        print_header("Scanning for Real Infrastructure Details")
+        print_warning("Ansible inventory not found - skipping context-aware infrastructure scan")
+        print_warning("To enable: Set ANSIBLE_INVENTORY_PATH in .env or create ansible_hosts.yml")
+        return True
+    
+    print_header("Scanning for Real Infrastructure Details (Context-Aware)")
+    print(f"Loaded {len(inventory_data['ips'])} IP addresses, " +
+          f"{len(inventory_data['hostnames'])} hostnames, " +
+          f"{len(inventory_data['domains'])} domains from inventory")
+    
+    issues = []
+    
+    # Files to check (exclude sensitive files that should already be gitignored)
+    files_to_check = []
+    
+    # Python files
+    files_to_check.extend([f for f in script_dir.glob('*.py') 
+                          if f.name != 'pre_publish_check.py'])
+    
+    # Markdown files (all public ones - exclude gitignored CLAUDE.md and PROJECT_INSTRUCTIONS.md)
+    all_md_files = script_dir.glob('*.md')
+    gitignored_md = {'CLAUDE.md', 'PROJECT_INSTRUCTIONS.md'}
+    for md_file in all_md_files:
+        if md_file.name not in gitignored_md:
+            files_to_check.append(md_file)
+    
+    # YAML example files
+    files_to_check.extend(script_dir.glob('*.example.yml'))
+    files_to_check.extend(script_dir.glob('*.example.yaml'))
+    
+    for file_path in files_to_check:
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            found_issues = []
+            
+            # Check for real IP addresses
+            for ip in inventory_data['ips']:
+                if ip in content:
+                    # Make sure it's not in a comment explaining what to replace
+                    lines_with_ip = [line for line in content.split('\n') if ip in line]
+                    # Filter out comments that are clearly examples
+                    real_occurrences = [line for line in lines_with_ip 
+                                       if not any(keyword in line.lower() 
+                                                 for keyword in ['example', 'replace', 'your-ip', 
+                                                               'placeholder', 'template'])]
+                    if real_occurrences:
+                        found_issues.append(f"Real IP address: {ip}")
+            
+            # Check for real hostnames
+            for hostname in inventory_data['hostnames']:
+                # Use word boundaries to avoid false positives
+                pattern = r'\b' + re.escape(hostname) + r'\b'
+                if re.search(pattern, content, re.IGNORECASE):
+                    # Check if it's in a comment/example context
+                    lines_with_hostname = [line for line in content.split('\n') 
+                                          if re.search(pattern, line, re.IGNORECASE)]
+                    real_occurrences = [line for line in lines_with_hostname 
+                                       if not any(keyword in line.lower() 
+                                                 for keyword in ['example', 'replace', 'your-host',
+                                                               'placeholder', 'template', 'e.g.', 'i.e.'])]
+                    if real_occurrences:
+                        found_issues.append(f"Real hostname: {hostname}")
+            
+            # Check for real domain names (be careful with common domains)
+            for domain in inventory_data['domains']:
+                # Skip very common domains that might be coincidental
+                if domain in ['local', 'com', 'net', 'org', 'home']:
+                    continue
+                pattern = r'\b' + re.escape(domain) + r'\b'
+                if re.search(pattern, content, re.IGNORECASE):
+                    lines_with_domain = [line for line in content.split('\n') 
+                                        if re.search(pattern, line, re.IGNORECASE)]
+                    real_occurrences = [line for line in lines_with_domain 
+                                       if not any(keyword in line.lower() 
+                                                 for keyword in ['example', 'replace', 'your-domain',
+                                                               'placeholder', 'template'])]
+                    if real_occurrences:
+                        found_issues.append(f"Real domain: {domain}")
+            
+            if found_issues:
+                print_error(f"{file_path.name}: Found real infrastructure details!")
+                for issue in set(found_issues):  # Use set to avoid duplicates
+                    print(f"  → {issue}")
+                issues.append(f"{file_path.name} contains real infrastructure details")
+            else:
+                print_success(f"{file_path.name}: No real infrastructure details found")
+                
+        except Exception as e:
+            print_warning(f"Error scanning {file_path.name}: {e}")
+    
+    if issues:
+        print()
+        print_error("❌ Found references to real infrastructure in files that will be committed!")
+        print_error("These files should only contain example/placeholder data.")
+    else:
+        print()
+        print_success("✅ No real infrastructure details found in public files")
+    
+    return len(issues) == 0
+
 def final_reminders():
     """Print final reminders"""
     print_header("Final Pre-Publication Checklist")
@@ -329,10 +526,12 @@ def final_reminders():
     reminders = [
         "Review git history for accidentally committed secrets",
         "Ensure .env is NOT in git history (git rm --cached .env if needed)",
+        "Ensure ansible_hosts.yml is NOT in git history (if you have one)",
         "Test with a fresh clone in a new directory",
         "Verify .gitignore is working (git status should not show sensitive files)",
         "Double-check that PROJECT_INSTRUCTIONS.md and CLAUDE.md are gitignored",
         "Verify CLAUDE.example.md exists and contains placeholder data only",
+        "Context-aware check scanned for YOUR real IPs/hostnames (if inventory found)",
         "Review all commits for sensitive data before pushing",
         "Consider using 'git secrets' or similar tools",
         "Update GitHub repository description and tags",
@@ -352,6 +551,12 @@ def main():
     
     print(f"Checking directory: {script_dir}\n")
     
+    # Load Ansible inventory for context-aware checking
+    inventory_data = load_ansible_inventory()
+    if inventory_data:
+        print(f"✓ Loaded Ansible inventory with {len(inventory_data['ips'])} IPs, " +
+              f"{len(inventory_data['hostnames'])} hosts, {len(inventory_data['domains'])} domains\n")
+    
     all_passed = True
     
     # Run checks
@@ -368,6 +573,10 @@ def main():
         all_passed = False
     
     if not scan_markdown_files():
+        all_passed = False
+    
+    # NEW: Context-aware infrastructure scanning
+    if not scan_for_real_infrastructure(inventory_data):
         all_passed = False
     
     # Final summary

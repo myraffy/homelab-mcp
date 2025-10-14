@@ -264,7 +264,7 @@ Monitor and manage Ollama AI model instances across your homelab, plus check you
 - **Load Balancing**: Automatically distributes requests across multiple Ollama instances
 - **Failover**: If one Ollama server is down, requests route to healthy servers
 - **OpenAI Compatibility**: Use any OpenAI SDK/library with your local models
-- **Centralized Access**: Single endpoint (e.g., `http://10.0.1.232:4000`) for all models
+- **Centralized Access**: Single endpoint (e.g., `http://192.0.2.10:4000`) for all models
 - **Usage Tracking**: Monitor which models are being used most
 
 **Tools:**

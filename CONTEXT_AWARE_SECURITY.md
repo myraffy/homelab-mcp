@@ -42,8 +42,8 @@ Loaded 22 IP addresses, 24 hostnames, 3 domains from inventory
 ✓ ansible_mcp_server.py: No real infrastructure details found
 ✓ docker_mcp_podman.py: No real infrastructure details found
 ✗ README.md: Found real infrastructure details!
-  → Real IP address: 10.0.1.232
-  → Real hostname: Dell-Server
+  → Real IP address: 192.0.2.100
+  → Real hostname: Server-01
 
 ✗ ❌ Found references to real infrastructure in files that will be committed!
 ✗ These files should only contain example/placeholder data.
@@ -95,10 +95,10 @@ This prevents false positives in documentation that instructs users to "replace 
 ### ✅ Catches These Problems:
 ```python
 # AI accidentally uses your real hostname
-docker_host = "Dell-Server"  # ❌ CAUGHT!
+docker_host = "Server-01"  # ❌ CAUGHT!
 
 # Using real IP as example
-EXAMPLE_HOST = "10.0.1.232"  # ❌ CAUGHT!
+EXAMPLE_HOST = "192.0.2.100"  # ❌ CAUGHT!
 ```
 
 ### ✅ Allows These Examples:
