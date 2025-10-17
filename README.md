@@ -28,15 +28,15 @@ See [SECURITY.md](SECURITY.md) for comprehensive security guidance.
 This project includes several documentation files for different audiences:
 
 - **[README.md](README.md)** (this file) - Installation, setup, and usage guide
-- **[PROJECT_INSTRUCTIONS.md](PROJECT_INSTRUCTIONS.md)** - Copy into Claude project instructions for AI context
-- **[CLAUDE.md](CLAUDE.md)** - Developer guide for AI assistants and contributors
+- **[PROJECT_INSTRUCTIONS.md](PROJECT_INSTRUCTIONS.example.md)** - Copy into Claude project instructions for AI context
+- **[CLAUDE.md](CLAUDE.example.md)** - Developer guide for AI assistants and contributors
 - **[SECURITY.md](SECURITY.md)** - Security policies and best practices  
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute to this project
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
 
 **👥 For End Users:** Follow this README + copy PROJECT_INSTRUCTIONS.md to Claude  
-**🤖 For AI Assistants:** Read CLAUDE.md for complete development context  
-**🔧 For Contributors:** Start with CONTRIBUTING.md and CLAUDE.md
+**🤖 For AI Assistants:** Read [CLAUDE.md](CLAUDE.example.md) for complete development context  
+**🔧 For Contributors:** Start with CONTRIBUTING.md and [CLAUDE.md](CLAUDE.example.md)
 
 ## �📖 Important: Configure Claude Project Instructions
 
@@ -548,7 +548,7 @@ Core dependencies:
 
 ## 🛠️ Development
 
-**📖 First time contributing?** Read [CLAUDE.md](CLAUDE.md) for complete development guidance including architecture patterns, security requirements, and AI assistant workflows.
+**📖 First time contributing?** Read [CLAUDE.md](CLAUDE.example.md) for complete development guidance including architecture patterns, security requirements, and AI assistant workflows.
 
 ### Getting Started
 
@@ -762,7 +762,7 @@ Copyright (c) 2025 Barnaby Jeans
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ### For AI Assistants & Developers
-**📖 Read [CLAUDE.md](CLAUDE.md) first** - This file contains:
+**📖 Read [CLAUDE.md](CLAUDE.example.md) first** - This file contains:
 - Complete project architecture and development patterns
 - Security requirements and common pitfalls to avoid
 - Specific workflows for adding features and fixing bugs
