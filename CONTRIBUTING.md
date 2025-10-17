@@ -38,7 +38,7 @@ Feature requests are welcome! Please:
    - Add/update tests if applicable
    - Update documentation as needed
 4. **Test thoroughly** with real infrastructure
-5. **Run security check:** `python pre_publish_check.py`
+5. **Run security check:** `python helpers/pre_publish_check.py`
 6. **Commit your changes** with clear, descriptive messages
 7. **Push to your fork** and submit a pull request
 
@@ -50,7 +50,7 @@ Feature requests are welcome! Please:
 - [ ] Documentation updated (README, docstrings, comments)
 - [ ] Security implications reviewed
 - [ ] Tested with actual homelab services
-- [ ] `pre_publish_check.py` passes
+- [ ] `helpers/pre_publish_check.py` passes
 
 **PR Description should include:**
 - What problem does this solve?
@@ -75,7 +75,7 @@ cp .env.example .env
 # Edit .env with your test environment details
 
 # Install git hook (recommended)
-python install_git_hook.py
+python helpers/install_git_hook.py
 ```
 
 ### Testing
@@ -84,7 +84,7 @@ Before submitting a PR:
 
 ```bash
 # Run security checker
-python pre_publish_check.py
+python helpers/pre_publish_check.py
 
 # Test with your homelab
 # Update .env with test credentials
@@ -120,7 +120,7 @@ python docker_mcp_podman.py
 - ❌ Never commit real IP addresses or hostnames
 - ✅ Always use environment variables for secrets
 - ✅ Always validate user inputs
-- ✅ Run `pre_publish_check.py` before committing
+- ✅ Run `helpers/pre_publish_check.py` before committing
 
 ## Project Structure
 
@@ -131,7 +131,12 @@ homelab-mcp/
 ├── SECURITY.md        # Security documentation
 ├── README.md          # User documentation
 ├── requirements.txt   # Python dependencies
-└── pre_publish_check.py  # Security validation
+├── helpers/           # Development and validation tools
+│   ├── pre_publish_check.py   # Security validation
+│   ├── install_git_hook.py    # Git pre-commit hook installer
+│   ├── run_checks.py          # CI/CD check runner
+│   └── requirements-dev.txt   # Development dependencies
+└── archive-ignore/    # Archived versions and test files
 ```
 
 ## Questions?
