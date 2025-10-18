@@ -264,10 +264,11 @@ ls -la .env
 ## 📚 Additional Resources
 
 - [Docker Security Best Practices](https://docs.docker.com/engine/security/)
-- [Pi-hole Security](https://docs.pi-hole.net/main/security/)
+- [Pi-hole API Documentation](https://docs.pi-hole.net/api/)
 - [Unifi Security Best Practices](https://help.ui.com/hc/en-us/articles/204910084)
-- [Ansible Security](https://docs.ansible.com/ansible/latest/user_guide/playbooks_vault.html)
+- [Ansible Vault Documentation](https://docs.ansible.com/ansible/latest/vault_guide/index.html)
 - [OWASP API Security Top 10](https://owasp.org/www-project-api-security/)
+
 
 ## 📅 Revision History
 
