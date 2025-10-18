@@ -16,6 +16,7 @@ A collection of Model Context Protocol (MCP) servers for managing and monitoring
 This project interacts with critical infrastructure (Docker APIs, DNS, network devices). Improper configuration can expose your homelab to security risks.
 
 **Key Security Requirements:**
+
 - **NEVER expose Docker/Podman APIs to the internet** - Use firewall rules to restrict access
 - **Keep `.env` file secure** - Contains API keys and should never be committed
 - **Use unique API keys** - Generate separate keys for each service
@@ -34,8 +35,8 @@ This project includes several documentation files for different audiences:
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute to this project
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
 
-**👥 For End Users:** Follow this README + copy PROJECT_INSTRUCTIONS.md to Claude  
-**🤖 For AI Assistants:** Read [CLAUDE.md](CLAUDE.example.md) for complete development context  
+**👥 For End Users:** Follow this README + copy PROJECT_INSTRUCTIONS.md to Claude
+**🤖 For AI Assistants:** Read [CLAUDE.md](CLAUDE.example.md) for complete development context
 **🔧 For Contributors:** Start with CONTRIBUTING.md and [CLAUDE.md](CLAUDE.example.md)
 
 ## �📖 Important: Configure Claude Project Instructions
@@ -43,6 +44,7 @@ This project includes several documentation files for different audiences:
 After setting up the MCP servers, **create your personalized project instructions**:
 
 1. **Copy the example templates:**
+
    ```bash
    # Windows
    copy PROJECT_INSTRUCTIONS.example.md PROJECT_INSTRUCTIONS.md
@@ -74,6 +76,7 @@ After setting up the MCP servers, **create your personalized project instruction
    - Paste into the "Project instructions" field
 
 **What's included:**
+
 - Detailed MCP server capabilities and usage patterns
 - Infrastructure overview and monitoring capabilities  
 - Specific commands and tools available for each service
@@ -84,12 +87,14 @@ This README covers installation and basic setup. The project instructions provid
 ## 🚀 Quick Start
 
 ### 1. Clone the repository
+
 ```bash
 git clone https://github.com/bjeans/homelab-mcp
 cd homelab-mcp
 ```
 
 ### 2. Install security checks (recommended)
+
 ```bash
 # Install pre-push git hook for automatic security validation
 python helpers/install_git_hook.py
@@ -98,6 +103,7 @@ python helpers/install_git_hook.py
 ### 3. Set up configuration files
 
 **Environment variables:**
+
 ```bash
 # Windows
 copy .env.example .env
@@ -107,6 +113,7 @@ cp .env.example .env
 ```
 
 Edit `.env` with your actual values:
+
 ```bash
 # Windows
 notepad .env
@@ -116,6 +123,7 @@ nano .env
 ```
 
 **Ansible inventory (if using):**
+
 ```bash
 # Windows
 copy ansible_hosts.example.yml ansible_hosts.yml
@@ -127,6 +135,7 @@ cp ansible_hosts.example.yml ansible_hosts.yml
 Edit with your infrastructure details.
 
 **Project instructions:**
+
 ```bash
 # Windows
 copy PROJECT_INSTRUCTIONS.example.md PROJECT_INSTRUCTIONS.md
@@ -138,6 +147,7 @@ cp PROJECT_INSTRUCTIONS.example.md PROJECT_INSTRUCTIONS.md
 Customize with your network topology and servers.
 
 **AI development guide (for contributors):**
+
 ```bash
 # Windows
 copy CLAUDE.example.md CLAUDE.md
@@ -149,6 +159,7 @@ cp CLAUDE.example.md CLAUDE.md
 Update with your repository URLs, Notion workspace, and infrastructure details.
 
 ### 4. Install Python dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -156,11 +167,13 @@ pip install -r requirements.txt
 ### 5. Add to Claude Desktop config
 
 **Config file location:**
+
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
 **Add the MCP servers:**
+
 ```json
 {
   "mcpServers": {
@@ -195,16 +208,19 @@ pip install -r requirements.txt
 ### 6. Restart Claude Desktop
 
 ### 7. Add project instructions to Claude
-- Copy the contents of your customized `PROJECT_INSTRUCTIONS.md` 
+
+- Copy the contents of your customized `PROJECT_INSTRUCTIONS.md`
 - Paste into your Claude project's "Project instructions" field
 - This gives Claude comprehensive context about your MCP capabilities
 
 ## 📦 Available MCP Servers
 
 ### MCP Registry Inspector
+
 Provides introspection into your MCP development environment.
 
 **Tools:**
+
 - `get_claude_config` - View Claude Desktop MCP configuration
 - `list_mcp_servers` - List all registered MCP servers
 - `list_mcp_directory` - Browse MCP development directory
@@ -213,17 +229,20 @@ Provides introspection into your MCP development environment.
 - `search_mcp_files` - Search for files by name
 
 **Configuration:**
+
 ```bash
 MCP_DIRECTORY=/path/to/your/Homelab-MCP
 CLAUDE_CONFIG_PATH=/path/to/claude_desktop_config.json  # Optional
 ```
 
 ### Docker/Podman Container Manager
+
 Manage Docker and Podman containers across multiple hosts.
 
 **🔒 Security Warning:** Docker/Podman APIs typically use unencrypted HTTP without authentication. See [SECURITY.md](SECURITY.md) for required firewall configuration.
 
 **Tools:**
+
 - `get_docker_containers` - Get containers on a specific host
 - `get_all_containers` - Get all containers across all hosts
 - `get_container_stats` - Get CPU and memory stats
@@ -231,17 +250,20 @@ Manage Docker and Podman containers across multiple hosts.
 
 **Configuration Options:**
 
-*Option 1: Using Ansible Inventory (Recommended)*
+**Option 1: Using Ansible Inventory (Recommended)**
+
 ```bash
 ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
 ```
 
-*Option 2: Using Environment Variables*
+**Option 2: Using Environment Variables**
+
 ```bash
 DOCKER_SERVER1_ENDPOINT=192.168.1.100:2375
 DOCKER_SERVER2_ENDPOINT=192.168.1.101:2375
 PODMAN_SERVER1_ENDPOINT=192.168.1.102:8080
 ```
+
 
 ### Ollama AI Model Manager
 
@@ -250,17 +272,20 @@ Monitor and manage Ollama AI model instances across your homelab, plus check you
 #### What's Included
 
 **Ollama Monitoring:**
+
 - Track multiple Ollama instances across different hosts
 - View available models and their sizes
 - Check instance health and availability
 
 **LiteLLM Proxy Integration:**
+
 - LiteLLM provides a unified OpenAI-compatible API across all your Ollama instances
 - Enables load balancing and failover between multiple Ollama servers
 - Allows you to use OpenAI client libraries with your local models
 - The MCP server can verify your LiteLLM proxy is online and responding
 
 **Why use LiteLLM?**
+
 - **Load Balancing**: Automatically distributes requests across multiple Ollama instances
 - **Failover**: If one Ollama server is down, requests route to healthy servers
 - **OpenAI Compatibility**: Use any OpenAI SDK/library with your local models
@@ -268,13 +293,15 @@ Monitor and manage Ollama AI model instances across your homelab, plus check you
 - **Usage Tracking**: Monitor which models are being used most
 
 **Tools:**
+
 - `get_ollama_status` - Check status of all Ollama instances and model counts
 - `get_ollama_models` - Get detailed model list for a specific host
 - `get_litellm_status` - Verify LiteLLM proxy is online and responding
 
 **Configuration Options:**
 
-*Option 1: Using Ansible Inventory (Recommended)*
+**Option 1: Using Ansible Inventory (Recommended)**
+
 ```bash
 ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
 OLLAMA_PORT=11434  # Default Ollama port
@@ -284,7 +311,8 @@ LITELLM_HOST=192.168.1.100  # Host running LiteLLM proxy
 LITELLM_PORT=4000           # LiteLLM proxy port (default: 4000)
 ```
 
-*Option 2: Using Environment Variables*
+**Option 2: Using Environment Variables**
+
 ```bash
 # Ollama Instances
 OLLAMA_SERVER1=192.168.1.100
@@ -296,16 +324,19 @@ LITELLM_HOST=192.168.1.100
 LITELLM_PORT=4000
 ```
 
+
 **Setting Up LiteLLM (Optional):**
 
 If you want to use LiteLLM for unified access to your Ollama instances:
 
 1. **Install LiteLLM** on one of your servers:
+
    ```bash
    pip install litellm[proxy]
    ```
 
 2. **Create configuration** (`litellm_config.yaml`):
+
    ```yaml
    model_list:
      - model_name: llama3.2
@@ -322,14 +353,17 @@ If you want to use LiteLLM for unified access to your Ollama instances:
    ```
 
 3. **Start LiteLLM proxy**:
+
    ```bash
    litellm --config litellm_config.yaml --port 4000
    ```
 
 4. **Use the MCP tool** to verify it's running:
+
    - In Claude: "Check my LiteLLM proxy status"
 
 **Example Usage:**
+
 - "What Ollama instances do I have running?"
 - "Show me all models on my Dell-Server"
 - "Is my LiteLLM proxy online?"
@@ -337,17 +371,20 @@ If you want to use LiteLLM for unified access to your Ollama instances:
 
 
 ### Pi-hole DNS Manager
+
 Monitor Pi-hole DNS statistics and status.
 
 **🔒 Security Note:** Store Pi-hole API keys securely in `.env` file. Generate unique keys per instance.
 
 **Tools:**
+
 - `get_pihole_stats` - Get DNS statistics from all Pi-hole instances
 - `get_pihole_status` - Check which Pi-hole instances are online
 
 **Configuration Options:**
 
-*Option 1: Using Ansible Inventory (Recommended)*
+**Option 1: Using Ansible Inventory (Recommended)**
+
 ```bash
 ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
 # API keys still required in .env:
@@ -355,7 +392,8 @@ PIHOLE_API_KEY_SERVER1=your-api-key-here
 PIHOLE_API_KEY_SERVER2=your-api-key-here
 ```
 
-*Option 2: Using Environment Variables*
+**Option 2: Using Environment Variables**
+
 ```bash
 PIHOLE_API_KEY_SERVER1=your-api-key
 PIHOLE_API_KEY_SERVER2=your-api-key
@@ -366,21 +404,25 @@ PIHOLE_SERVER2_PORT=8053
 ```
 
 **Getting Pi-hole API Keys:**
+
 - Web UI: Settings → API → Show API Token
 - Or generate new: `pihole -a -p` on Pi-hole server
 
 ### Unifi Network Monitor
+
 Monitor Unifi network infrastructure and clients with caching for performance.
 
 **🔒 Security Note:** Use a dedicated API key with minimal required permissions.
 
 **Tools:**
+
 - `get_network_devices` - Get all network devices (switches, APs, gateways)
 - `get_network_clients` - Get all active network clients
 - `get_network_summary` - Get network overview
 - `refresh_network_data` - Force refresh from controller (bypasses cache)
 
 **Configuration:**
+
 ```bash
 UNIFI_API_KEY=your-unifi-api-key
 UNIFI_HOST=192.168.1.1
@@ -389,9 +431,11 @@ UNIFI_HOST=192.168.1.1
 **Note:** Data is cached for 5 minutes to improve performance. Use `refresh_network_data` to force update.
 
 ### Ansible Inventory Inspector
+
 Query Ansible inventory information (read-only).
 
 **Tools:**
+
 - `get_all_hosts` - Get all hosts in inventory
 - `get_all_groups` - Get all groups
 - `get_host_details` - Get detailed host information
@@ -402,26 +446,31 @@ Query Ansible inventory information (read-only).
 - `reload_inventory` - Reload inventory from disk
 
 **Configuration:**
+
 ```bash
 ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
 ```
 
 ### Ping Network Connectivity Monitor
+
 Test network connectivity and host availability using ICMP ping across your infrastructure.
 
 **Why use this?**
+
 - Quick health checks during outages or after power events
 - Verify which hosts are reachable before querying service-specific MCPs
 - Simple troubleshooting tool to identify network issues
 - Baseline connectivity testing for your infrastructure
 
 **Tools:**
+
 - `ping_host` - Ping a single host by name (resolved from Ansible inventory)
 - `ping_group` - Ping all hosts in an Ansible group concurrently
 - `ping_all` - Ping all infrastructure hosts concurrently
 - `list_groups` - List available Ansible groups for ping operations
 
 **Features:**
+
 - ✅ **Cross-platform support** - Works on Windows, Linux, and macOS
 - ✅ **Ansible integration** - Automatically resolves hostnames/IPs from inventory
 - ✅ **Concurrent pings** - Test multiple hosts simultaneously for faster results
@@ -430,12 +479,14 @@ Test network connectivity and host availability using ICMP ping across your infr
 - ✅ **No dependencies** - Uses system `ping` command (no extra libraries needed)
 
 **Configuration:**
+
 ```bash
 ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
 # No additional API keys required!
 ```
 
 **Example Usage:**
+
 - "Ping server1.example.local"
 - "Check connectivity to all Pi-hole servers"
 - "Ping all Ubuntu_Server hosts"
@@ -443,6 +494,7 @@ ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
 - "What groups can I ping?"
 
 **When to use:**
+
 - **After power outages** - Quickly identify which hosts came back online
 - **Before service checks** - Verify host is reachable before checking specific services
 - **Network troubleshooting** - Isolate connectivity issues from service issues
@@ -455,23 +507,27 @@ ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
 This project includes automated security validation to prevent accidental exposure of sensitive data:
 
 **Install the pre-push git hook (recommended):**
+
 ```bash
 # From project root
 python helpers/install_git_hook.py
 ```
 
 **What it does:**
+
 - Automatically runs `helpers/pre_publish_check.py` before every git push
 - Blocks pushes that contain potential secrets or sensitive data
 - Protects against accidentally committing API keys, passwords, or personal information
 
 **Manual security check:**
+
 ```bash
 # Run security validation manually
 python helpers/pre_publish_check.py
 ```
 
 **Bypass security check (use with extreme caution):**
+
 ```bash
 # Only when absolutely necessary
 git push --no-verify
@@ -480,6 +536,7 @@ git push --no-verify
 ### Critical Security Practices
 
 **Configuration Files:**
+
 - ✅ **DO** use `.env.example` as a template
 - ✅ **DO** keep `.env` file permissions restrictive (`chmod 600` on Linux/Mac)
 - ❌ **NEVER** commit `.env` to version control
@@ -487,6 +544,7 @@ git push --no-verify
 - ❌ **NEVER** commit `PROJECT_INSTRUCTIONS.md` with real network topology
 
 **API Security:**
+
 - ✅ **DO** use unique API keys for each service
 - ✅ **DO** rotate API keys regularly (every 90 days recommended)
 - ✅ **DO** use strong, randomly-generated keys (32+ characters)
@@ -494,6 +552,7 @@ git push --no-verify
 - ❌ **NEVER** reuse API keys between environments
 
 **Network Security:**
+
 - ✅ **DO** use firewall rules to restrict API access
 - ✅ **DO** implement VLAN segmentation
 - ✅ **DO** enable TLS/HTTPS where possible
@@ -504,22 +563,27 @@ git push --no-verify
 ## 📋 Requirements
 
 ### System Requirements
+
 - **Python**: 3.10 or higher
 - **Claude Desktop**: Latest version recommended
 - **Network Access**: Connectivity to homelab services
 
 ### Python Dependencies
+
 Install via `requirements.txt`:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 Core dependencies:
+
 - `mcp` - Model Context Protocol SDK
 - `aiohttp` - Async HTTP client
 - `pyyaml` - YAML parsing for Ansible inventory
 
 ### Service Requirements
+
 - **Docker/Podman**: API enabled on monitored hosts
 - **Pi-hole**: v6+ with API enabled
 - **Unifi Controller**: API access enabled
@@ -529,17 +593,21 @@ Core dependencies:
 ## 💻 Compatibility
 
 ### Tested Platforms
+
 **Developed and tested on:**
+
 - **OS**: Windows 11
 - **Claude Desktop**: Version 0.13.64
 - **Python**: Version 3.13.8
 
 ### Cross-Platform Notes
+
 **Windows**: Fully tested and supported ✅
 **macOS**: Should work but untested ⚠️
 **Linux**: Should work but untested ⚠️
 
 **Known platform differences:**
+
 - File paths in documentation are Windows-style
 - Path separators may need adjustment for Unix systems
 - `.env` file permissions should be set on Unix (`chmod 600 .env`)
@@ -553,11 +621,13 @@ Core dependencies:
 ### Getting Started
 
 1. **Install security git hook (required for contributors):**
+
    ```bash
    python helpers/install_git_hook.py
    ```
 
 2. **Set up development environment:**
+
    ```bash
    pip install -r requirements.txt
    cp .env.example .env
@@ -572,6 +642,7 @@ The `helpers/` directory contains utility scripts for development and deployment
 - **`pre_publish_check.py`** - Security validation script (runs automatically via git hook)
 
 **Usage:**
+
 ```bash
 # Install security git hook
 python helpers/install_git_hook.py
@@ -581,7 +652,8 @@ python helpers/pre_publish_check.py
 ```
 
 ### Project Structure
-```
+
+```text
 Homelab-MCP/
 ├── helpers/                 # Utility and setup scripts
 │   ├── install_git_hook.py # Git pre-push hook installer
@@ -608,6 +680,7 @@ Homelab-MCP/
 ### Adding a New MCP Server
 
 1. **Create the server file**
+
    ```python
    #!/usr/bin/env python3
    """
@@ -620,6 +693,7 @@ Homelab-MCP/
    ```
 
 2. **Add configuration to `.env.example`**
+
    ```bash
    # My Service Configuration
    MY_SERVICE_HOST=192.168.1.100
@@ -643,11 +717,13 @@ Homelab-MCP/
 All MCP servers support two configuration methods:
 
 **1. Environment Variables (`.env` file)**
+
 - Simple key=value pairs
 - Loaded automatically by each MCP server
 - Good for simple setups or testing
 
 **2. Ansible Inventory (recommended for production)**
+
 - Centralized infrastructure definition
 - Supports complex host groupings
 - Better for multi-host environments
@@ -665,6 +741,7 @@ All MCP servers support two configuration methods:
 ### Testing Checklist
 
 Before committing changes:
+
 - [ ] Security git hook installed (`python helpers/install_git_hook.py`)
 - [ ] Manual security check passes (`python helpers/pre_publish_check.py`)
 - [ ] No sensitive data in code or commits
@@ -680,6 +757,7 @@ Before committing changes:
 ### MCP Servers Not Appearing in Claude
 
 1. **Check Claude Desktop config:**
+
    ```bash
    # Windows
    type %APPDATA%\Claude\claude_desktop_config.json
@@ -695,6 +773,7 @@ Before committing changes:
 ### Connection Errors
 
 **Docker/Podman API:**
+
 ```bash
 # Test connectivity
 curl http://your-host:2375/containers/json
@@ -704,12 +783,14 @@ netstat -an | grep 2375
 ```
 
 **Pi-hole API:**
+
 ```bash
 # Test API key
 curl "http://your-pihole/api/stats/summary?sid=YOUR_API_KEY"
 ```
 
 **Ollama:**
+
 ```bash
 # Test Ollama endpoint
 curl http://your-host:11434/api/tags
@@ -718,6 +799,7 @@ curl http://your-host:11434/api/tags
 ### Import Errors
 
 If you get Python import errors:
+
 ```bash
 # Reinstall dependencies
 pip install --upgrade -r requirements.txt
@@ -729,6 +811,7 @@ pip show mcp
 ### Permission Errors
 
 **On Linux/Mac:**
+
 ```bash
 # Fix .env permissions
 chmod 600 .env
@@ -740,11 +823,13 @@ chmod +x *.py
 ## 📚 Additional Resources
 
 ### MCP Protocol
+
 - [MCP Documentation](https://modelcontextprotocol.io/)
 - [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
 - [Claude Desktop MCP Guide](https://docs.anthropic.com/claude/docs)
 
 ### Related Projects
+
 - [Ansible Documentation](https://docs.ansible.com/)
 - [Docker API Reference](https://docs.docker.com/engine/api/)
 - [Pi-hole API](https://docs.pi-hole.net/)
@@ -762,7 +847,9 @@ Copyright (c) 2025 Barnaby Jeans
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ### For AI Assistants & Developers
+
 **📖 Read [CLAUDE.md](CLAUDE.example.md) first** - This file contains:
+
 - Complete project architecture and development patterns
 - Security requirements and common pitfalls to avoid
 - Specific workflows for adding features and fixing bugs
