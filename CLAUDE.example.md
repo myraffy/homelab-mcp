@@ -19,7 +19,7 @@ This project provides real-time monitoring and control of homelab infrastructure
 
 ## Project Structure
 
-```
+```text
 homelab-mcp/
 ├── ansible_mcp_server.py          # Ansible inventory queries
 ├── docker_mcp_podman.py           # Docker/Podman container monitoring
@@ -51,6 +51,7 @@ homelab-mcp/
 ## Setup Instructions
 
 To use this file:
+
 1. Copy `CLAUDE.example.md` to `CLAUDE.md`
 2. Update any personal URLs or infrastructure details with your actual values
 3. Never commit your customized `CLAUDE.md` - it's in `.gitignore` for security
@@ -60,7 +61,9 @@ To use this file:
 ## Architecture Patterns
 
 ### MCP Server Pattern
+
 All servers follow this structure:
+
 ```python
 @server.list_tools()
 async def handle_list_tools() -> list[types.Tool]:
@@ -80,11 +83,13 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
 ```
 
 ### Configuration Hierarchy
+
 1. **Ansible Inventory** (Primary) - Single source of truth for infrastructure
 2. **Environment Variables** (.env) - Service-specific credentials
 3. **Defaults** - Fallback values in code
 
 ### Error Handling
+
 - Always use try/except blocks
 - Return structured error responses
 - Log to stderr for debugging
@@ -114,6 +119,7 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
 ### Security Checklist
 
 Before any commit:
+
 - [ ] No hardcoded IPs, hostnames, or credentials
 - [ ] All sensitive data uses environment variables
 - [ ] Example files use placeholder data (example.com, 192.0.2.x)
@@ -124,24 +130,28 @@ Before any commit:
 ## Key Technical Decisions
 
 ### Why Ansible Inventory as Primary Config?
+
 - Users already manage infrastructure with Ansible
 - Single source of truth for all host details
 - Reduces duplication across MCP servers
 - Easier to keep configuration in sync
 
 ### Why Individual Server Files?
+
 - Easier to maintain and debug
 - Users can enable only what they need
 - Clearer separation of concerns
 - Simpler dependency management
 
 ### Why Python?
+
 - Native MCP SDK support
 - Strong async/await support
 - Rich ecosystem for API clients
 - Familiar to sysadmins and developers
 
 ### Why No Database?
+
 - All data fetched in real-time from services
 - Reduces complexity and maintenance
 - Ensures data is always current
@@ -150,6 +160,7 @@ Before any commit:
 ## Common AI Assistant Tasks
 
 ### "Add feature X to server Y"
+
 1. Read the server file completely
 2. Understand current tool structure
 3. Add new tool following existing patterns
@@ -158,6 +169,7 @@ Before any commit:
 6. Update README.md documentation
 
 ### "Debug connection issue"
+
 1. Check .env.example for required variables
 2. Verify error handling in server code
 3. Test API endpoint independently
@@ -165,6 +177,7 @@ Before any commit:
 5. Validate credentials format
 
 ### "Improve error messages"
+
 1. Review all error_response() calls
 2. Make messages user-friendly
 3. Don't expose internal details
@@ -172,6 +185,7 @@ Before any commit:
 5. Test each error path
 
 ### "Update documentation"
+
 1. Update inline docstrings first
 2. Update README.md server section
 3. Update PROJECT_INSTRUCTIONS.example.md if workflow changes
@@ -179,13 +193,16 @@ Before any commit:
 5. Consider if SECURITY.md needs updates
 
 ### "Create task reminder for user"
+
 When user asks to remember something or track an issue:
+
 1. Create GitHub issues in the homelab-mcp repository for bugs or feature requests
 2. Use your preferred task management system (if configured)
 3. Include detailed content with context and steps to reproduce
 4. Add appropriate labels and assign if working on the project
 
 **Examples of reminder requests:**
+
 - "Remind me to reboot Server-01 to test auto-start"
 - "Add upgrading Pi-hole to my todo list"
 - "Don't forget to check that certificate renewal"
@@ -197,6 +214,7 @@ When user asks to remember something or track an issue:
 ## Testing Strategy
 
 ### Manual Testing
+
 ```bash
 # Set up test environment
 cp .env.example .env
@@ -212,6 +230,7 @@ python ansible_mcp_server.py
 ```
 
 ### Security Testing
+
 ```bash
 # Before every commit
 python pre_publish_check.py
@@ -225,6 +244,7 @@ python install_git_hook.py
 ## Red Flags to Watch For
 
 ⚠️ **Never do these:**
+
 - Hardcoding IPs, hostnames, or credentials
 - Exposing API keys or tokens in logs
 - Committing .env or other config files
@@ -233,6 +253,7 @@ python install_git_hook.py
 - Assuming services are always available
 
 ✅ **Always do these:**
+
 - Use environment variables for all config
 - Validate inputs before API calls
 - Handle network timeouts gracefully
@@ -242,7 +263,8 @@ python install_git_hook.py
 
 ## Working with Issues and PRs
 
-### Good Issue Reports Include:
+### Good Issue Reports Include
+
 - MCP server name and version
 - Claude Desktop version
 - Operating system
@@ -250,7 +272,8 @@ python install_git_hook.py
 - Steps to reproduce
 - Expected vs actual behavior
 
-### Good Pull Requests Include:
+### Good Pull Requests Include
+
 - Clear description of problem solved
 - Testing performed
 - Documentation updates
@@ -261,20 +284,25 @@ python install_git_hook.py
 ## Task Management Integration
 
 ### GitHub Issues (Recommended)
+
 Use the homelab-mcp GitHub repository for project-related tasks:
+
 - **Bugs**: Report issues with MCP servers or infrastructure problems
 - **Feature Requests**: Suggest new MCP servers or enhancements
 - **Documentation**: Improvements to guides, examples, or clarity
 - **Security**: Report security concerns or improvement suggestions
 
 ### Personal Task Management (Optional)
+
 You may also integrate with your preferred task management system for personal homelab tasks:
+
 - Infrastructure maintenance reminders
 - Upgrade schedules
 - Testing checklists
 - Configuration changes
 
 **Task Categories (for GitHub issues):**
+
 - `bug` - Something isn't working
 - `enhancement` - New feature or request  
 - `documentation` - Improvements or additions to docs
