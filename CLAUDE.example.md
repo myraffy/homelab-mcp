@@ -23,13 +23,12 @@ This project provides real-time monitoring and control of homelab infrastructure
 homelab-mcp/
 ├── ansible_mcp_server.py          # Ansible inventory queries
 ├── docker_mcp_podman.py           # Docker/Podman container monitoring
-├── ollama_mcp_server.py           # Ollama AI model management
-├── pihole_mcp_server.py           # Pi-hole DNS monitoring
-├── unifi_network_mcp_server.py    # Unifi network device monitoring
+├── ollama_mcp.py                  # Ollama AI model management
+├── pihole_mcp.py                  # Pi-hole DNS monitoring
+├── unifi_mcp_optimized.py         # Unifi network device monitoring
 ├── ping_mcp_server.py             # Network connectivity testing (ICMP ping)
 ├── mcp_registry_inspector.py      # MCP server file management
-├── pre_publish_check.py           # Security validation script
-├── install_git_hook.py            # Git pre-push hook installer
+├── unifi_exporter.py              # Unifi data export utility
 ├── .env.example                   # Configuration template
 ├── ansible_hosts.example.yml      # Ansible inventory example
 ├── PROJECT_INSTRUCTIONS.example.md # AI assistant guide
@@ -38,8 +37,15 @@ homelab-mcp/
 ├── SECURITY.md                    # Security guidelines
 ├── CONTRIBUTING.md                # Contribution guide
 ├── CHANGELOG.md                   # Version history
+├── CONTEXT_AWARE_SECURITY.md      # Context-aware security scanning
+├── CI_CD_CHECKS.md                # CI/CD automation documentation
 ├── LICENSE                        # MIT License
-└── .gitignore                     # Git ignore rules
+├── .gitignore                     # Git ignore rules
+└── helpers/                       # Utility and setup scripts
+    ├── install_git_hook.py        # Git pre-push hook installer
+    ├── pre_publish_check.py       # Security validation script
+    ├── run_checks.py              # CI/CD check runner
+    └── requirements-dev.txt       # Development dependencies
 ```
 
 ## Setup Instructions
