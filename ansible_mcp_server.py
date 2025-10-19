@@ -15,6 +15,15 @@ import yaml
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
+from mcp_config_loader import load_env_file, COMMON_ALLOWED_ENV_VARS
+
+# Load .env with security hardening
+SCRIPT_DIR = Path(__file__).parent
+ENV_FILE = SCRIPT_DIR / ".env"
+
+# Ansible server only needs the common allowed variables
+load_env_file(ENV_FILE, allowed_vars=COMMON_ALLOWED_ENV_VARS, strict=True)
+
 # Default inventory path - can be overridden via environment variable
 DEFAULT_INVENTORY_PATH = os.getenv("ANSIBLE_INVENTORY_PATH", "ansible_hosts.yml")
 

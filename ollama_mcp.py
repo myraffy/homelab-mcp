@@ -31,11 +31,12 @@ server = Server("ollama-info")
 SCRIPT_DIR = Path(__file__).parent
 ENV_FILE = SCRIPT_DIR / ".env"
 
+# Allowlist for Ollama server - use pattern matching for flexibility
+# OLLAMA_* matches OLLAMA_PORT, OLLAMA_SERVER1, OLLAMA_CUSTOM_HOST, etc.
+# LITELLM_* matches all LiteLLM proxy configuration variables
 OLLAMA_ALLOWED_VARS = COMMON_ALLOWED_ENV_VARS | {
-    'OLLAMA_PORT',
-    'LITELLM_HOST',
-    'LITELLM_PORT',
-    'OLLAMA_*',  # Matches OLLAMA_SERVER1, OLLAMA_SERVER2, etc.
+    'OLLAMA_*',      # Pattern: covers OLLAMA_PORT, OLLAMA_SERVER*, etc.
+    'LITELLM_*',     # Pattern: covers LITELLM_HOST, LITELLM_PORT, etc.
 }
 
 load_env_file(ENV_FILE, allowed_vars=OLLAMA_ALLOWED_VARS, strict=True)

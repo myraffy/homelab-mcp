@@ -7,7 +7,6 @@ Handles .env file loading with security hardening and allowlist validation
 import fnmatch
 import logging
 import os
-import sys
 from pathlib import Path
 from typing import Dict, Optional, Set
 
@@ -54,7 +53,7 @@ def load_env_file(
     logger.info(f"Loading configuration from {env_file_path}")
     
     try:
-        with open(env_file_path, 'r') as f:
+        with open(env_file_path, 'r', encoding='utf-8') as f:
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
                 
@@ -70,6 +69,11 @@ def load_env_file(
                 key, value = line.split('=', 1)
                 key = key.strip()
                 value = value.strip()
+                
+                # Strip quotes if present (handles both single and double quotes)
+                if (value.startswith('"') and value.endswith('"')) or \
+                   (value.startswith("'") and value.endswith("'")):
+                    value = value[1:-1]
                 
                 # Validate key format (alphanumeric, underscore only)
                 if not is_valid_env_var_name(key):
