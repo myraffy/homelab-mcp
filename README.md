@@ -634,6 +634,28 @@ Core dependencies:
    # Edit .env with your test values
    ```
 
+### Testing MCP Servers Locally
+
+**Before submitting a PR, test your MCP server changes locally using the MCP Inspector tool.**
+
+**Quick start:**
+
+```bash
+# Install MCP Inspector (one time)
+npm install -g @modelcontextprotocol/inspector
+
+# Test your changes
+npx @modelcontextprotocol/inspector uv --directory . run <server>_mcp.py
+```
+
+This opens a web-based debugger at `http://localhost:5173` where you can:
+- See all available tools for the MCP server
+- Test each tool with sample arguments
+- Verify responses are properly formatted
+- Debug issues before submitting PRs
+
+**For detailed testing instructions**, see the **Testing MCP Servers Locally** section in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ### Helper Scripts
 
 The `helpers/` directory contains utility scripts for development and deployment:

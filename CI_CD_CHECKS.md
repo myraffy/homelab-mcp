@@ -6,10 +6,101 @@ This document describes all automated checks configured for the Homelab MCP proj
 
 The project uses multiple layers of automated checks to ensure code quality, security, and compatibility:
 
-1. **Local Pre-Commit Checks** - Run before git push
-2. **Local Development Checks** - Run manually during development
-3. **GitHub Actions CI/CD** - Run automatically on push/PR
-4. **Scheduled Checks** - Run periodically for maintenance
+1. **Local MCP Testing** - Test individual servers before committing (optional but recommended)
+2. **Local Pre-Commit Checks** - Run before git push
+3. **Local Development Checks** - Run manually during development
+4. **GitHub Actions CI/CD** - Run automatically on push/PR
+5. **Scheduled Checks** - Run periodically for maintenance
+
+---
+
+## 🧪 Local MCP Testing with Inspector
+
+**Recommended:** Test your MCP servers locally before running automated checks. This helps catch functional issues early.
+
+### Prerequisites
+
+Install the MCP Inspector tool:
+
+```bash
+npm install -g @modelcontextprotocol/inspector
+```
+
+### Testing Individual Servers
+
+From the `Homelab-MCP` directory, use the MCP Inspector to test each server:
+
+```bash
+# General format
+npx @modelcontextprotocol/inspector uv --directory . run <server_file>
+
+# Examples:
+npx @modelcontextprotocol/inspector uv --directory . run ollama_mcp.py
+npx @modelcontextprotocol/inspector uv --directory . run docker_mcp_podman.py
+npx @modelcontextprotocol/inspector uv --directory . run pihole_mcp.py
+npx @modelcontextprotocol/inspector uv --directory . run ansible_mcp_server.py
+npx @modelcontextprotocol/inspector uv --directory . run unifi_mcp_optimized.py
+```
+
+### Using the Inspector
+
+1. Command opens a web-based debugger at `http://localhost:5173`
+2. Interface shows all available tools for the MCP server
+3. Test each tool with sample arguments
+4. Verify responses are correct and properly formatted
+5. Check for error messages or unexpected behavior
+6. Terminal displays debug logs and errors (useful for development)
+
+### Common Testing Workflow
+
+```bash
+# 1. Make your code changes to an MCP server
+# 2. Test with MCP Inspector
+npx @modelcontextprotocol/inspector uv --directory . run your_mcp.py
+
+# 3. In browser: Test each tool with appropriate arguments
+#    - Verify responses match expected format
+#    - Check error handling for invalid inputs
+#    - Confirm no sensitive data in responses
+
+# 4. Review terminal output for debug logs
+# 5. Stop MCP Inspector (Ctrl+C)
+
+# 6. Then proceed to automated checks:
+python helpers/run_checks.py
+```
+
+### Troubleshooting MCP Inspector Tests
+
+**Server fails to start:**
+- Verify `.env` file exists with required credentials
+- Check Ansible inventory file exists (if applicable)
+- Verify Python dependencies installed: `pip install -r requirements.txt`
+- Check for syntax errors: `python -m py_compile your_mcp.py`
+
+**Tools not showing up:**
+- Verify `@server.list_tools()` decorator is present
+- Confirm tools are properly defined
+- Check server stdout/stderr in terminal
+
+**Tool calls fail:**
+- Verify `@server.call_tool()` decorator exists
+- Test with valid arguments first
+- Check `.env` configuration is correct
+- Review error messages in terminal
+
+**Response format issues:**
+- All tool results must return `list[types.TextContent]`
+- Verify: `return [types.TextContent(type="text", text="result")]`
+- Check logging goes to stderr, not stdout
+
+### When to Use Local Testing
+
+- **Before submitting PRs** - Catch functional issues early
+- **After major changes** - Verify tool implementations work as expected
+- **When adding new tools** - Test each tool individually
+- **Debugging** - Use MCP Inspector to isolate issues
+- **Before automated checks** - Ensure basic functionality works
 
 ---
 

@@ -78,7 +78,65 @@ cp .env.example .env
 python helpers/install_git_hook.py
 ```
 
-### Testing
+### Testing MCP Servers Locally
+
+Before submitting a PR, test your MCP servers locally using the MCP Inspector:
+
+**Install the MCP Inspector tool:**
+
+```bash
+npm install -g @modelcontextprotocol/inspector
+```
+
+**Test individual servers:**
+
+```bash
+# Test Ollama MCP server
+npx @modelcontextprotocol/inspector uv --directory . run ollama_mcp.py
+
+# Test Docker/Podman MCP server
+npx @modelcontextprotocol/inspector uv --directory . run docker_mcp_podman.py
+
+# Test Pi-hole MCP server
+npx @modelcontextprotocol/inspector uv --directory . run pihole_mcp.py
+
+# Test Ansible inventory MCP server
+npx @modelcontextprotocol/inspector uv --directory . run ansible_mcp_server.py
+
+# Test Unifi MCP server
+npx @modelcontextprotocol/inspector uv --directory . run unifi_mcp_optimized.py
+
+# Test MCP Registry Inspector
+npx @modelcontextprotocol/inspector uv --directory . run mcp_registry_inspector.py
+```
+
+**What the MCP Inspector does:**
+
+- Launches an interactive web-based debugger at `http://localhost:5173`
+- Shows all available tools for the MCP server
+- Allows you to test tool calls with sample arguments
+- Displays tool responses and error messages
+- Helpful for debugging tool implementations before Claude integration
+
+**Quick testing workflow:**
+
+1. Open terminal in the `Homelab-MCP` directory
+2. Run the MCP Inspector command for the server you're testing
+3. Browser opens to the debugger interface
+4. Test each tool with appropriate arguments
+5. Verify responses are correct and complete
+6. Check for any error messages or unexpected behavior
+7. Review logs in the terminal for debug output
+
+**Debugging tips:**
+
+- Check `.env` file is configured with test credentials
+- Verify Ansible inventory file exists if testing Ansible-dependent servers
+- Use `logging` statements in your code (logged to stderr, visible in terminal)
+- Test with both valid and invalid arguments to verify error handling
+- Pay attention to response format - must return `list[types.TextContent]`
+
+### Running Security Checks
 
 Before submitting a PR:
 
@@ -86,11 +144,8 @@ Before submitting a PR:
 # Run security checker
 python helpers/pre_publish_check.py
 
-# Test with your homelab
-# Update .env with test credentials
-python ansible_mcp_server.py  # Test individual servers
-python docker_mcp_podman.py
-# etc.
+# Run all development checks
+python helpers/run_checks.py
 ```
 
 ### Adding a New MCP Server
