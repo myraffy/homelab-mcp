@@ -32,22 +32,19 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
+from mcp_config_loader import load_env_file, COMMON_ALLOWED_ENV_VARS
+
 server = Server("ping-info")
 
-# Load .env file
+# Load .env with security hardening
 SCRIPT_DIR = Path(__file__).parent
 ENV_FILE = SCRIPT_DIR / ".env"
 
-if ENV_FILE.exists():
-    logger.info(f"Loading configuration from {ENV_FILE}")
-    with open(ENV_FILE, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                os.environ[key.strip()] = value.strip()
-else:
-    logger.warning(f".env file not found at {ENV_FILE}")
+PING_ALLOWED_VARS = COMMON_ALLOWED_ENV_VARS | {
+    'PING_*',  # Pattern for ping-specific variables if needed
+}
+
+load_env_file(ENV_FILE, allowed_vars=PING_ALLOWED_VARS, strict=True)
 
 # Configuration
 ANSIBLE_INVENTORY_PATH = os.getenv("ANSIBLE_INVENTORY_PATH", "")
