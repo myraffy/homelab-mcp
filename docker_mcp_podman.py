@@ -229,6 +229,55 @@ def normalize_container_info(container: Dict, runtime: str) -> Dict:
         return container
 
 
+def format_labels_output(labels: Dict, indent: str = "  ") -> str:
+    """
+    Format container labels for display, highlighting traefik and custom domain labels
+
+    Args:
+        labels: Dictionary of container labels
+        indent: Indentation string
+
+    Returns:
+        Formatted label string for display
+    """
+    if not labels:
+        return ""
+
+    output = f"{indent}Labels:\n"
+
+    # Separate and prioritize traefik labels
+    traefik_labels = {}
+    domain_labels = {}
+    other_labels = {}
+
+    for key, value in labels.items():
+        if "traefik" in key.lower():
+            traefik_labels[key] = value
+        elif any(domain_key in key.lower() for domain_key in ["domain", "host", "url"]):
+            domain_labels[key] = value
+        else:
+            other_labels[key] = value
+
+    # Display traefik labels first
+    for key, value in traefik_labels.items():
+        output += f"{indent}  • {key}: {value}\n"
+
+    # Then domain-related labels
+    for key, value in domain_labels.items():
+        output += f"{indent}  • {key}: {value}\n"
+
+    # Then other labels (show first 5)
+    for i, (key, value) in enumerate(other_labels.items()):
+        if i < 5:
+            output += f"{indent}  • {key}: {value}\n"
+
+    if len(other_labels) > 5:
+        remaining = len(other_labels) - 5
+        output += f"{indent}  ... and {remaining} more labels\n"
+
+    return output
+
+
 @server.list_tools()
 async def handle_list_tools() -> list[types.Tool]:
     """List available container management tools"""
@@ -282,6 +331,47 @@ async def handle_list_tools() -> list[types.Tool]:
                     "container": {
                         "type": "string",
                         "description": "Container name to check",
+                    },
+                },
+                "required": ["hostname", "container"],
+            },
+        ),
+        types.Tool(
+            name="find_containers_by_label",
+            description="Find containers by label key-value pair (e.g., find traefik-enabled containers or containers with specific domains)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "hostname": {
+                        "type": "string",
+                        "description": f"Host to search (or 'all' for all hosts): {', '.join(CONTAINER_HOSTS.keys())}",
+                    },
+                    "label_key": {
+                        "type": "string",
+                        "description": "Label key to search for (e.g., 'traefik.http.routers.web.rule', 'domain', 'app')",
+                    },
+                    "label_value": {
+                        "type": "string",
+                        "description": "Optional: Label value to match (substring match). If not provided, returns all containers with this key",
+                    },
+                },
+                "required": ["label_key"],
+            },
+        ),
+        types.Tool(
+            name="get_container_labels",
+            description="Get all labels for a specific container",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "hostname": {
+                        "type": "string",
+                        "description": f"Host: {', '.join(CONTAINER_HOSTS.keys())}",
+                        "enum": list(CONTAINER_HOSTS.keys()),
+                    },
+                    "container": {
+                        "type": "string",
+                        "description": "Container name",
                     },
                 },
                 "required": ["hostname", "container"],
@@ -359,7 +449,30 @@ async def handle_call_tool(
                             port_str = f" | Ports: {', '.join(port_mappings)}"
 
                     output += f"• {name_str} ({image})\n"
-                    output += f"  Status: {status}{port_str}\n\n"
+                    output += f"  Status: {status}{port_str}\n"
+
+                    # Show relevant labels if present
+                    labels = norm.get("Labels", {})
+                    if labels:
+                        # Extract traefik and domain labels for quick reference
+                        traefik_labels = {k: v for k, v in labels.items() if "traefik" in k.lower()}
+                        domain_labels = {
+                            k: v
+                            for k, v in labels.items()
+                            if any(d in k.lower() for d in ["domain", "host", "url"])
+                        }
+
+                        if traefik_labels or domain_labels:
+                            output += "  Labels:\n"
+                            for key, value in list(traefik_labels.items())[:3]:
+                                # Truncate long values
+                                display_value = value if len(str(value)) <= 50 else str(value)[:47] + "..."
+                                output += f"    • {key}: {display_value}\n"
+                            for key, value in list(domain_labels.items())[:2]:
+                                display_value = value if len(str(value)) <= 50 else str(value)[:47] + "..."
+                                output += f"    • {key}: {display_value}\n"
+
+                    output += "\n"
 
             return [types.TextContent(type="text", text=output)]
 
@@ -526,20 +639,168 @@ async def handle_call_tool(
                 for name in names:
                     clean_name = name.lstrip("/")
                     if clean_name == container_name or name == container_name:
-                        return [
-                            types.TextContent(
-                                type="text",
-                                text=f"✓ Container '{container_name}' is RUNNING on {hostname}\n"
-                                f"  Image: {norm['Image']}\n"
-                                f"  Status: {norm['Status']}\n"
-                                f"  Runtime: {runtime}",
-                            )
-                        ]
+                        output = f"✓ Container '{container_name}' is RUNNING on {hostname}\n"
+                        output += f"  Image: {norm['Image']}\n"
+                        output += f"  Status: {norm['Status']}\n"
+                        output += f"  Runtime: {runtime}\n"
+
+                        # Include labels if present
+                        labels = norm.get("Labels", {})
+                        if labels:
+                            output += "\n" + format_labels_output(labels)
+
+                        return [types.TextContent(type="text", text=output)]
 
             return [
                 types.TextContent(
                     type="text",
                     text=f"✗ Container '{container_name}' is NOT running on {hostname}",
+                )
+            ]
+
+        elif name == "find_containers_by_label":
+            label_key = arguments.get("label_key", "") if arguments else ""
+            label_value = arguments.get("label_value", "") if arguments else ""
+            hostname_arg = arguments.get("hostname", "all") if arguments else "all"
+
+            if not label_key:
+                return [
+                    types.TextContent(
+                        type="text",
+                        text="Error: label_key is required",
+                    )
+                ]
+
+            # Determine which hosts to search
+            hosts_to_search = (
+                CONTAINER_HOSTS.keys()
+                if hostname_arg.lower() == "all"
+                else [hostname_arg]
+            )
+
+            output = f"Searching for containers with label key: '{label_key}'\n"
+            if label_value:
+                output += f"Value filter: '{label_value}'\n"
+            output += f"Hosts: {', '.join(hosts_to_search)}\n\n"
+
+            results_found = False
+
+            for hostname in hosts_to_search:
+                if hostname not in CONTAINER_HOSTS:
+                    output += f"✗ Unknown host: {hostname}\n"
+                    continue
+
+                runtime = CONTAINER_HOSTS[hostname]["runtime"]
+                containers = await container_api_request(hostname, "/containers/json")
+
+                if containers is None:
+                    output += f"✗ Could not connect to {hostname}\n"
+                    continue
+
+                matching_containers = []
+
+                for container in containers:
+                    norm = normalize_container_info(container, runtime)
+                    labels = norm.get("Labels", {})
+
+                    # Check if label key exists
+                    for key, value in labels.items():
+                        if label_key.lower() in key.lower():
+                            # If label_value provided, check if it matches (substring)
+                            if label_value and label_value.lower() not in str(value).lower():
+                                continue
+
+                            matching_containers.append((key, value, norm))
+                            results_found = True
+
+                if matching_containers:
+                    output += f"--- {hostname.upper()} ({runtime.upper()}) ---\n"
+                    for label_key_found, label_value_found, norm in matching_containers:
+                        name_str = (
+                            norm["Names"][0].lstrip("/") if norm["Names"] else "Unknown"
+                        )
+                        output += f"• {name_str}\n"
+                        output += f"  Label: {label_key_found}\n"
+                        output += f"  Value: {label_value_found}\n"
+                        output += f"  Image: {norm['Image']}\n\n"
+
+            if not results_found:
+                output += "No containers found matching the label criteria.\n"
+
+            return [types.TextContent(type="text", text=output)]
+
+        elif name == "get_container_labels":
+            hostname = arguments.get("hostname", "") if arguments else ""
+            container_name = arguments.get("container", "") if arguments else ""
+
+            if not hostname or not container_name:
+                return [
+                    types.TextContent(
+                        type="text",
+                        text="Error: Both hostname and container name are required",
+                    )
+                ]
+
+            if hostname not in CONTAINER_HOSTS:
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=f"Error: Unknown host '{hostname}'",
+                    )
+                ]
+
+            runtime = CONTAINER_HOSTS[hostname]["runtime"]
+            containers = await container_api_request(hostname, "/containers/json")
+
+            if containers is None:
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=f"Error: Could not connect to {runtime.capitalize()} API on {hostname}",
+                    )
+                ]
+
+            for container in containers:
+                norm = normalize_container_info(container, runtime)
+                names = norm["Names"]
+
+                # Check if container name matches (with or without leading /)
+                for name in names:
+                    clean_name = name.lstrip("/")
+                    if clean_name == container_name or name == container_name:
+                        labels = norm.get("Labels", {})
+
+                        output = f"Container: {container_name}\n"
+                        output += f"Host: {hostname}\n"
+                        output += f"Image: {norm['Image']}\n"
+                        output += f"Status: {norm['Status']}\n\n"
+
+                        if not labels:
+                            output += "No labels configured for this container.\n"
+                        else:
+                            output += f"Total Labels: {len(labels)}\n\n"
+
+                            # Group labels by prefix
+                            label_groups = {}
+                            for key, value in sorted(labels.items()):
+                                prefix = key.split(".")[0] if "." in key else "other"
+                                if prefix not in label_groups:
+                                    label_groups[prefix] = []
+                                label_groups[prefix].append((key, value))
+
+                            # Display grouped labels
+                            for prefix in sorted(label_groups.keys()):
+                                output += f"{prefix.upper()}:\n"
+                                for key, value in label_groups[prefix]:
+                                    output += f"  {key}: {value}\n"
+                                output += "\n"
+
+                        return [types.TextContent(type="text", text=output)]
+
+            return [
+                types.TextContent(
+                    type="text",
+                    text=f"✗ Container '{container_name}' not found on {hostname}",
                 )
             ]
 
