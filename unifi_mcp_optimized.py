@@ -24,21 +24,21 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
+from mcp_config_loader import load_env_file, COMMON_ALLOWED_ENV_VARS
+
 server = Server("unifi-network")
 
 # Configuration
 SCRIPT_DIR = Path(__file__).parent
 ENV_FILE = SCRIPT_DIR / ".env"
 
-# Load .env file if it exists
-if ENV_FILE.exists():
-    logger.info(f"Loading configuration from {ENV_FILE}")
-    with open(ENV_FILE, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                os.environ[key.strip()] = value.strip()
+# Load .env with security hardening
+UNIFI_ALLOWED_VARS = COMMON_ALLOWED_ENV_VARS | {
+    'UNIFI_HOST',
+    'UNIFI_API_KEY',
+}
+
+load_env_file(ENV_FILE, allowed_vars=UNIFI_ALLOWED_VARS, strict=True)
 
 UNIFI_EXPORTER_PATH = SCRIPT_DIR / "unifi_exporter.py"
 UNIFI_HOST = os.getenv("UNIFI_HOST", "192.168.1.1")
@@ -48,6 +48,7 @@ UNIFI_API_KEY = os.getenv("UNIFI_API_KEY", "")
 CACHE_DIR = Path(tempfile.gettempdir()) / "unifi_mcp_cache"
 CACHE_DIR.mkdir(exist_ok=True)
 CACHE_DURATION = timedelta(minutes=5)  # Cache data for 5 minutes
+
 
 logger.info(f"Unifi host: {UNIFI_HOST}")
 logger.info(f"API key configured: {'Yes' if UNIFI_API_KEY else 'No'}")

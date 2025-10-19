@@ -23,20 +23,22 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
+from mcp_config_loader import load_env_file, COMMON_ALLOWED_ENV_VARS
+
 server = Server("ollama-info")
 
-# Load .env if exists
+# Load .env with security hardening
 SCRIPT_DIR = Path(__file__).parent
 ENV_FILE = SCRIPT_DIR / ".env"
 
-if ENV_FILE.exists():
-    logger.info(f"Loading configuration from {ENV_FILE}")
-    with open(ENV_FILE, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                os.environ[key.strip()] = value.strip()
+OLLAMA_ALLOWED_VARS = COMMON_ALLOWED_ENV_VARS | {
+    'OLLAMA_PORT',
+    'LITELLM_HOST',
+    'LITELLM_PORT',
+    'OLLAMA_*',  # Matches OLLAMA_SERVER1, OLLAMA_SERVER2, etc.
+}
+
+load_env_file(ENV_FILE, allowed_vars=OLLAMA_ALLOWED_VARS, strict=True)
 
 # Configuration
 ANSIBLE_INVENTORY_PATH = os.getenv("ANSIBLE_INVENTORY_PATH", "")
