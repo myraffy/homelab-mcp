@@ -41,7 +41,7 @@ SCRIPT_DIR = Path(__file__).parent
 ENV_FILE = SCRIPT_DIR / ".env"
 
 PING_ALLOWED_VARS = COMMON_ALLOWED_ENV_VARS | {
-    'PING_*',  # Pattern for ping-specific variables if needed
+    "PING_*",  # Pattern for ping-specific variables if needed
 }
 
 load_env_file(ENV_FILE, allowed_vars=PING_ALLOWED_VARS, strict=True)
@@ -58,113 +58,114 @@ def load_ansible_inventory():
     """
     Load and cache the Ansible inventory with full variable inheritance
     Returns dict with hosts and groups
-    
+
     Properly merges variables from:
     1. Group vars (from parent to child)
     2. Host vars (override group vars)
     """
     global INVENTORY_DATA
-    
+
     if INVENTORY_DATA is not None:
         return INVENTORY_DATA
-    
+
     if not ANSIBLE_INVENTORY_PATH or not Path(ANSIBLE_INVENTORY_PATH).exists():
         logger.error(f"Ansible inventory not found at: {ANSIBLE_INVENTORY_PATH}")
         return {"hosts": {}, "groups": {}}
-    
+
     try:
-        with open(ANSIBLE_INVENTORY_PATH, 'r') as f:
+        with open(ANSIBLE_INVENTORY_PATH, "r") as f:
             inventory = yaml.safe_load(f)
-        
+
         hosts = {}
         groups = {}
         group_vars = {}  # Store vars for each group
-        
+
         def collect_group_vars(group_name, group_data, parent_groups=None):
             """First pass: collect all group vars"""
             if parent_groups is None:
                 parent_groups = []
-            
+
             current_groups = parent_groups + [group_name]
-            
+
             # Store group vars
             if group_name not in group_vars:
                 group_vars[group_name] = {}
-            
-            if 'vars' in group_data:
-                group_vars[group_name] = group_data['vars'].copy()
-            
+
+            if "vars" in group_data:
+                group_vars[group_name] = group_data["vars"].copy()
+
             # Recursively process children
-            if 'children' in group_data:
-                for child_name, child_data in group_data['children'].items():
+            if "children" in group_data:
+                for child_name, child_data in group_data["children"].items():
                     collect_group_vars(child_name, child_data, current_groups)
-        
-        def process_group(group_name, group_data, parent_groups=None, inherited_vars=None):
+
+        def process_group(
+            group_name, group_data, parent_groups=None, inherited_vars=None
+        ):
             """Second pass: process groups with inherited vars"""
             if parent_groups is None:
                 parent_groups = []
             if inherited_vars is None:
                 inherited_vars = {}
-            
+
             current_groups = parent_groups + [group_name]
-            
+
             # Merge inherited vars with this group's vars
             merged_vars = inherited_vars.copy()
             if group_name in group_vars:
                 merged_vars.update(group_vars[group_name])
-            
+
             # Process hosts in this group
-            if 'hosts' in group_data:
-                for hostname, host_vars in group_data['hosts'].items():
+            if "hosts" in group_data:
+                for hostname, host_vars in group_data["hosts"].items():
                     if hostname not in hosts:
-                        hosts[hostname] = {
-                            'groups': [],
-                            'vars': {}
-                        }
-                    
+                        hosts[hostname] = {"groups": [], "vars": {}}
+
                     # Add groups
-                    hosts[hostname]['groups'].extend(current_groups)
-                    
+                    hosts[hostname]["groups"].extend(current_groups)
+
                     # Merge vars: group vars first, then host vars override
-                    hosts[hostname]['vars'].update(merged_vars)
+                    hosts[hostname]["vars"].update(merged_vars)
                     if host_vars:
-                        hosts[hostname]['vars'].update(host_vars)
-            
+                        hosts[hostname]["vars"].update(host_vars)
+
             # Track group membership (use set to avoid duplicates)
             if group_name not in groups:
                 groups[group_name] = set()
-            
+
             # Add hosts to group tracking
-            if 'hosts' in group_data:
-                groups[group_name].update(group_data['hosts'].keys())
-            
+            if "hosts" in group_data:
+                groups[group_name].update(group_data["hosts"].keys())
+
             # Process child groups with accumulated vars
-            if 'children' in group_data:
-                for child_name, child_data in group_data['children'].items():
+            if "children" in group_data:
+                for child_name, child_data in group_data["children"].items():
                     process_group(child_name, child_data, current_groups, merged_vars)
                     # Also add child group's hosts to parent group
                     if child_name in groups:
                         groups[group_name].update(groups[child_name])
-        
+
         # First pass: collect all group vars
-        all_group = inventory.get('all', {})
-        if 'children' in all_group:
-            for group_name, group_data in all_group['children'].items():
+        all_group = inventory.get("all", {})
+        if "children" in all_group:
+            for group_name, group_data in all_group["children"].items():
                 collect_group_vars(group_name, group_data)
-        
+
         # Second pass: process groups with proper var inheritance
-        if 'children' in all_group:
-            for group_name, group_data in all_group['children'].items():
+        if "children" in all_group:
+            for group_name, group_data in all_group["children"].items():
                 process_group(group_name, group_data)
-        
+
         # Convert group sets to lists for JSON serialization
         groups = {k: list(v) for k, v in groups.items()}
-        
+
         INVENTORY_DATA = {"hosts": hosts, "groups": groups}
-        logger.info(f"Loaded {len(hosts)} hosts and {len(groups)} groups from Ansible inventory")
-        
+        logger.info(
+            f"Loaded {len(hosts)} hosts and {len(groups)} groups from Ansible inventory"
+        )
+
         return INVENTORY_DATA
-        
+
     except Exception as e:
         logger.error(f"Error loading Ansible inventory: {e}", exc_info=True)
         return {"hosts": {}, "groups": {}}
@@ -176,17 +177,17 @@ def get_host_ip(hostname: str, host_data: dict) -> str:
     Checks: ansible_host var, static_ip var, or uses hostname directly
     """
     # Check for ansible_host variable
-    if 'vars' in host_data and 'ansible_host' in host_data['vars']:
-        return host_data['vars']['ansible_host']
-    
+    if "vars" in host_data and "ansible_host" in host_data["vars"]:
+        return host_data["vars"]["ansible_host"]
+
     # Check for static_ip variable
-    if 'vars' in host_data and 'static_ip' in host_data['vars']:
-        return host_data['vars']['static_ip']
-    
+    if "vars" in host_data and "static_ip" in host_data["vars"]:
+        return host_data["vars"]["static_ip"]
+
     # Handle special case: hostname with port (e.g., hostname.example.com:2222)
-    if ':' in hostname:
-        hostname = hostname.split(':')[0]
-    
+    if ":" in hostname:
+        hostname = hostname.split(":")[0]
+
     # Use hostname directly
     return hostname
 
@@ -194,37 +195,34 @@ def get_host_ip(hostname: str, host_data: dict) -> str:
 async def ping_host(host: str, count: int = 4, timeout: int = 5) -> Dict:
     """
     Ping a single host using system ping command
-    
+
     Args:
         host: Hostname or IP address to ping
         count: Number of ping packets to send
         timeout: Timeout in seconds
-    
+
     Returns:
         Dict with status, stats, and error info
     """
     system = platform.system().lower()
-    
+
     # Build platform-specific ping command
     if system == "windows":
         cmd = ["ping", "-n", str(count), "-w", str(timeout * 1000), host]
     else:  # Linux, macOS, etc.
         cmd = ["ping", "-c", str(count), "-W", str(timeout), host]
-    
+
     try:
         process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
-        
+
         stdout, stderr = await asyncio.wait_for(
-            process.communicate(),
-            timeout=timeout + 5
+            process.communicate(), timeout=timeout + 5
         )
-        
-        output = stdout.decode('utf-8', errors='ignore')
-        
+
+        output = stdout.decode("utf-8", errors="ignore")
+
         # Parse output for statistics
         result = {
             "host": host,
@@ -234,23 +232,25 @@ async def ping_host(host: str, count: int = 4, timeout: int = 5) -> Dict:
             "packet_loss": 100.0,
             "rtt_min": None,
             "rtt_avg": None,
-            "rtt_max": None
+            "rtt_max": None,
         }
-        
+
         if process.returncode == 0:
             # Parse statistics from output
             if system == "windows":
                 # Windows format: "Packets: Sent = 4, Received = 4, Lost = 0 (0% loss)"
-                match = re.search(r'Received = (\d+)', output)
+                match = re.search(r"Received = (\d+)", output)
                 if match:
                     result["packets_received"] = int(match.group(1))
-                    result["packet_loss"] = ((count - result["packets_received"]) / count) * 100
-                
+                    result["packet_loss"] = (
+                        (count - result["packets_received"]) / count
+                    ) * 100
+
                 # Parse RTT: "Minimum = 1ms, Maximum = 2ms, Average = 1ms"
-                min_match = re.search(r'Minimum = (\d+)ms', output)
-                max_match = re.search(r'Maximum = (\d+)ms', output)
-                avg_match = re.search(r'Average = (\d+)ms', output)
-                
+                min_match = re.search(r"Minimum = (\d+)ms", output)
+                max_match = re.search(r"Maximum = (\d+)ms", output)
+                avg_match = re.search(r"Average = (\d+)ms", output)
+
                 if min_match:
                     result["rtt_min"] = float(min_match.group(1))
                 if max_match:
@@ -259,52 +259,60 @@ async def ping_host(host: str, count: int = 4, timeout: int = 5) -> Dict:
                     result["rtt_avg"] = float(avg_match.group(1))
             else:
                 # Unix format: "4 packets transmitted, 4 received, 0% packet loss"
-                match = re.search(r'(\d+) received', output)
+                match = re.search(r"(\d+) received", output)
                 if match:
                     result["packets_received"] = int(match.group(1))
-                    result["packet_loss"] = ((count - result["packets_received"]) / count) * 100
-                
+                    result["packet_loss"] = (
+                        (count - result["packets_received"]) / count
+                    ) * 100
+
                 # Parse RTT: "rtt min/avg/max/mdev = 1.234/2.345/3.456/0.123 ms"
-                rtt_match = re.search(r'rtt min/avg/max[/\w]* = ([\d.]+)/([\d.]+)/([\d.]+)', output)
+                rtt_match = re.search(
+                    r"rtt min/avg/max[/\w]* = ([\d.]+)/([\d.]+)/([\d.]+)", output
+                )
                 if rtt_match:
                     result["rtt_min"] = float(rtt_match.group(1))
                     result["rtt_avg"] = float(rtt_match.group(2))
                     result["rtt_max"] = float(rtt_match.group(3))
         else:
             result["error"] = f"Ping failed with return code {process.returncode}"
-        
+
         return result
-        
+
     except asyncio.TimeoutError:
         return {
             "host": host,
             "reachable": False,
-            "error": f"Ping timeout after {timeout + 5} seconds"
+            "error": f"Ping timeout after {timeout + 5} seconds",
         }
     except Exception as e:
         logger.error(f"Ping exception for {host}: {e}", exc_info=True)
         return {
             "host": host,
             "reachable": False,
-            "error": f"{type(e).__name__}: {str(e)}"
+            "error": f"{type(e).__name__}: {str(e)}",
         }
 
 
 def format_ping_result(result: Dict) -> str:
     """Format a single ping result for display"""
     output = []
-    
+
     if result["reachable"]:
         output.append(f"✓ {result['host']}: REACHABLE")
         if result.get("packets_received") is not None:
-            output.append(f"  Packets: {result['packets_received']}/{result['packets_sent']} received ({result['packet_loss']:.1f}% loss)")
+            output.append(
+                f"  Packets: {result['packets_received']}/{result['packets_sent']} received ({result['packet_loss']:.1f}% loss)"
+            )
         if result.get("rtt_avg") is not None:
-            output.append(f"  RTT: min={result['rtt_min']:.2f}ms avg={result['rtt_avg']:.2f}ms max={result['rtt_max']:.2f}ms")
+            output.append(
+                f"  RTT: min={result['rtt_min']:.2f}ms avg={result['rtt_avg']:.2f}ms max={result['rtt_max']:.2f}ms"
+            )
     else:
         output.append(f"✗ {result['host']}: UNREACHABLE")
         if "error" in result:
             output.append(f"  Error: {result['error']}")
-    
+
     return "\n".join(output)
 
 
@@ -320,21 +328,21 @@ async def handle_list_tools() -> list[types.Tool]:
                 "properties": {
                     "hostname": {
                         "type": "string",
-                        "description": "Hostname from Ansible inventory (e.g., 'server1.example.com', 'server2.example.com')"
+                        "description": "Hostname from Ansible inventory (e.g., 'server1.example.com', 'server2.example.com')",
                     },
                     "count": {
                         "type": "integer",
                         "description": "Number of ping packets to send (default: 4)",
-                        "default": 4
+                        "default": 4,
                     },
                     "timeout": {
                         "type": "integer",
                         "description": "Timeout in seconds per ping (default: 5)",
-                        "default": 5
-                    }
+                        "default": 5,
+                    },
                 },
-                "required": ["hostname"]
-            }
+                "required": ["hostname"],
+            },
         ),
         types.Tool(
             name="ping_group",
@@ -344,21 +352,21 @@ async def handle_list_tools() -> list[types.Tool]:
                 "properties": {
                     "group": {
                         "type": "string",
-                        "description": "Ansible group name (e.g., 'webservers', 'databases', 'docker_hosts')"
+                        "description": "Ansible group name (e.g., 'webservers', 'databases', 'docker_hosts')",
                     },
                     "count": {
                         "type": "integer",
                         "description": "Number of ping packets to send (default: 2)",
-                        "default": 2
+                        "default": 2,
                     },
                     "timeout": {
                         "type": "integer",
                         "description": "Timeout in seconds per ping (default: 3)",
-                        "default": 3
-                    }
+                        "default": 3,
+                    },
                 },
-                "required": ["group"]
-            }
+                "required": ["group"],
+            },
         ),
         types.Tool(
             name="ping_all",
@@ -369,67 +377,57 @@ async def handle_list_tools() -> list[types.Tool]:
                     "count": {
                         "type": "integer",
                         "description": "Number of ping packets to send (default: 2)",
-                        "default": 2
+                        "default": 2,
                     },
                     "timeout": {
                         "type": "integer",
                         "description": "Timeout in seconds per ping (default: 3)",
-                        "default": 3
-                    }
+                        "default": 3,
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         types.Tool(
             name="list_groups",
             description="List all available Ansible groups for pinging",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
+            inputSchema={"type": "object", "properties": {}, "required": []},
         ),
         types.Tool(
             name="list_hosts",
             description="List all hosts in the Ansible inventory with their resolved IPs",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
+            inputSchema={"type": "object", "properties": {}, "required": []},
         ),
         types.Tool(
             name="reload_inventory",
             description="Reload Ansible inventory from disk (useful after inventory changes)",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        )
+            inputSchema={"type": "object", "properties": {}, "required": []},
+        ),
     ]
 
 
 @server.call_tool()
-async def handle_call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
+async def handle_call_tool(
+    name: str, arguments: dict | None
+) -> list[types.TextContent]:
     """Handle tool calls"""
     try:
         inventory = load_ansible_inventory()
-        
+
         if name == "list_groups":
             output = "=== AVAILABLE ANSIBLE GROUPS ===\n\n"
-            
+
             if not inventory["groups"]:
                 output += "No groups found in inventory\n"
             else:
                 for group_name, hosts in sorted(inventory["groups"].items()):
                     output += f"• {group_name} ({len(hosts)} hosts)\n"
-            
+
             return [types.TextContent(type="text", text=output)]
-        
+
         elif name == "list_hosts":
             output = "=== ALL HOSTS IN INVENTORY ===\n\n"
-            
+
             if not inventory["hosts"]:
                 output += "No hosts found in inventory\n"
             else:
@@ -444,66 +442,80 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
                     if groups:
                         output += f"  Groups: {groups}\n"
                     output += "\n"
-            
+
             output += f"Total: {len(inventory['hosts'])} hosts\n"
             return [types.TextContent(type="text", text=output)]
-        
+
         elif name == "reload_inventory":
             global INVENTORY_DATA
             INVENTORY_DATA = None
             inventory = load_ansible_inventory()
-            
+
             output = "=== INVENTORY RELOADED ===\n\n"
             output += f"✓ Loaded {len(inventory['hosts'])} hosts\n"
             output += f"✓ Loaded {len(inventory['groups'])} groups\n"
-            
+
             return [types.TextContent(type="text", text=output)]
-        
+
         elif name == "ping_host":
             if not arguments or "hostname" not in arguments:
-                return [types.TextContent(type="text", text="Error: hostname parameter required")]
-            
+                return [
+                    types.TextContent(
+                        type="text", text="Error: hostname parameter required"
+                    )
+                ]
+
             hostname = arguments["hostname"]
             count = arguments.get("count", 4)
             timeout = arguments.get("timeout", 5)
-            
+
             if hostname not in inventory["hosts"]:
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error: Host '{hostname}' not found in inventory\nUse list_groups to see available hosts"
-                )]
-            
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=f"Error: Host '{hostname}' not found in inventory\nUse list_groups to see available hosts",
+                    )
+                ]
+
             host_data = inventory["hosts"][hostname]
             target = get_host_ip(hostname, host_data)
-            
+
             output = f"=== PINGING {hostname} ===\n"
             output += f"Target: {target}\n"
             output += f"Packets: {count}, Timeout: {timeout}s\n\n"
-            
+
             result = await ping_host(target, count, timeout)
             output += format_ping_result(result)
-            
+
             return [types.TextContent(type="text", text=output)]
-        
+
         elif name == "ping_group":
             if not arguments or "group" not in arguments:
-                return [types.TextContent(type="text", text="Error: group parameter required")]
-            
+                return [
+                    types.TextContent(
+                        type="text", text="Error: group parameter required"
+                    )
+                ]
+
             group_name = arguments["group"]
             count = arguments.get("count", 2)
             timeout = arguments.get("timeout", 3)
-            
+
             if group_name not in inventory["groups"]:
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error: Group '{group_name}' not found in inventory\nUse list_groups to see available groups"
-                )]
-            
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=f"Error: Group '{group_name}' not found in inventory\nUse list_groups to see available groups",
+                    )
+                ]
+
             hostnames = inventory["groups"][group_name]
-            
+
             output = f"=== PINGING GROUP: {group_name} ===\n"
-            output += f"Hosts: {len(hostnames)}, Packets: {count}, Timeout: {timeout}s\n\n"
-            
+            output += (
+                f"Hosts: {len(hostnames)}, Packets: {count}, Timeout: {timeout}s\n\n"
+            )
+
             # Ping all hosts concurrently
             tasks = []
             for hostname in hostnames:
@@ -511,56 +523,56 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
                     host_data = inventory["hosts"][hostname]
                     target = get_host_ip(hostname, host_data)
                     tasks.append(ping_host(target, count, timeout))
-            
+
             results = await asyncio.gather(*tasks)
-            
+
             # Sort by reachability (reachable first)
             results.sort(key=lambda r: (not r["reachable"], r["host"]))
-            
+
             for result in results:
                 output += format_ping_result(result) + "\n"
-            
+
             # Summary
             reachable = sum(1 for r in results if r["reachable"])
             output += f"\n--- SUMMARY ---\n"
             output += f"Reachable: {reachable}/{len(results)}\n"
-            
+
             return [types.TextContent(type="text", text=output)]
-        
+
         elif name == "ping_all":
             count = arguments.get("count", 2) if arguments else 2
             timeout = arguments.get("timeout", 3) if arguments else 3
-            
+
             hostnames = list(inventory["hosts"].keys())
-            
+
             output = f"=== PINGING ALL HOSTS ===\n"
             output += f"Total: {len(hostnames)} hosts, Packets: {count}, Timeout: {timeout}s\n\n"
-            
+
             # Ping all hosts concurrently
             tasks = []
             for hostname in hostnames:
                 host_data = inventory["hosts"][hostname]
                 target = get_host_ip(hostname, host_data)
                 tasks.append(ping_host(target, count, timeout))
-            
+
             results = await asyncio.gather(*tasks)
-            
+
             # Sort by reachability (reachable first)
             results.sort(key=lambda r: (not r["reachable"], r["host"]))
-            
+
             for result in results:
                 output += format_ping_result(result) + "\n"
-            
+
             # Summary
             reachable = sum(1 for r in results if r["reachable"])
             output += f"\n--- SUMMARY ---\n"
             output += f"Reachable: {reachable}/{len(results)} ({(reachable/len(results)*100):.1f}%)\n"
-            
+
             return [types.TextContent(type="text", text=output)]
-        
+
         else:
             return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
-            
+
     except Exception as e:
         logger.error(f"Error in tool {name}: {str(e)}", exc_info=True)
         return [types.TextContent(type="text", text=f"Error: {str(e)}")]
@@ -571,7 +583,7 @@ async def main():
     # Load inventory on startup
     inventory = load_ansible_inventory()
     logger.info(f"Ping MCP Server starting with {len(inventory['hosts'])} hosts")
-    
+
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
         await server.run(
             read_stream,
@@ -581,9 +593,9 @@ async def main():
                 server_version="1.0.0",
                 capabilities=server.get_capabilities(
                     notification_options=NotificationOptions(),
-                    experimental_capabilities={}
-                )
-            )
+                    experimental_capabilities={},
+                ),
+            ),
         )
 
 

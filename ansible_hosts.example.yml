@@ -13,7 +13,7 @@ all:
         ollama_port: 11434
         ollama_origins: "*"
         ollama_keep_alive: 24h
-      
+
       children:
         ollama_linux:
           children:
@@ -23,17 +23,17 @@ all:
                   ansible_host: 192.168.1.100
                 server2.example.local:
                   ansible_host: 192.168.1.101
-            
+
             ollama_rocky:
               hosts:
                 server3.example.local:
                   ansible_host: 192.168.1.102
-        
+
         ollama_mac:
           hosts:
             mac-mini.example.local:
               ansible_host: 192.168.1.103
-        
+
         ollama_windows:
           hosts:
             windows-pc.example.local:
@@ -56,17 +56,17 @@ all:
           ansible_host: 192.168.1.100
           container_runtime: docker
           docker_api_port: 2375
-        
+
         server2.example.local:
           ansible_host: 192.168.1.101
           container_runtime: docker
           docker_api_port: 2375
-        
+
         server3.example.local:
           ansible_host: 192.168.1.105
           container_runtime: docker
           docker_api_port: 2375
-    
+
     podman_hosts:
       hosts:
         nas-server.example.local:
@@ -84,11 +84,11 @@ all:
             server1.example.local:
               ansible_host: 192.168.1.100
               pihole_port: 8053
-            
+
             server2.example.local:
               ansible_host: 192.168.1.101
               pihole_port: 8053
-        
+
         pihole_native:
           hosts:
             pihole-pi.example.local:
@@ -110,15 +110,15 @@ all:
       hosts:
         server1.example.local:
         server2.example.local:
-    
+
     rocky_linux:
       hosts:
         server3.example.local:
-    
+
     macos:
       hosts:
         mac-mini.example.local:
-    
+
     windows:
       hosts:
         windows-pc.example.local:
@@ -129,7 +129,7 @@ all:
     datacenter:
       hosts:
         server1.example.local:
-    
+
     office:
       hosts:
         server2.example.local:

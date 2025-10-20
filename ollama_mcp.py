@@ -31,11 +31,12 @@ server = Server("ollama-info")
 SCRIPT_DIR = Path(__file__).parent
 ENV_FILE = SCRIPT_DIR / ".env"
 
+# Allowlist for Ollama server - use pattern matching for flexibility
+# OLLAMA_* matches OLLAMA_PORT, OLLAMA_SERVER1, OLLAMA_CUSTOM_HOST, etc.
+# LITELLM_* matches all LiteLLM proxy configuration variables
 OLLAMA_ALLOWED_VARS = COMMON_ALLOWED_ENV_VARS | {
-    'OLLAMA_PORT',
-    'LITELLM_HOST',
-    'LITELLM_PORT',
-    'OLLAMA_*',  # Matches OLLAMA_SERVER1, OLLAMA_SERVER2, etc.
+    "OLLAMA_*",  # Pattern: covers OLLAMA_PORT, OLLAMA_SERVER*, etc.
+    "LITELLM_*",  # Pattern: covers LITELLM_HOST, LITELLM_PORT, etc.
 }
 
 load_env_file(ENV_FILE, allowed_vars=OLLAMA_ALLOWED_VARS, strict=True)
@@ -61,49 +62,49 @@ def load_ollama_endpoints_from_ansible():
         logger.warning(f"Ansible inventory not found at: {ANSIBLE_INVENTORY_PATH}")
         logger.warning("Falling back to .env configuration")
         return load_ollama_endpoints_from_env()
-    
+
     try:
-        with open(ANSIBLE_INVENTORY_PATH, 'r') as f:
+        with open(ANSIBLE_INVENTORY_PATH, "r") as f:
             inventory = yaml.safe_load(f)
-        
+
         endpoints = {}
-        
+
         # Navigate through the inventory structure to find ollama_servers group
-        all_group = inventory.get('all', {})
-        children = all_group.get('children', {})
-        
+        all_group = inventory.get("all", {})
+        children = all_group.get("children", {})
+
         # Find ollama_servers group
-        ollama_group = children.get('ollama_servers', {})
-        ollama_children = ollama_group.get('children', {})
-        
+        ollama_group = children.get("ollama_servers", {})
+        ollama_children = ollama_group.get("children", {})
+
         # Process each OS-specific group
         for os_group_name, os_group_data in ollama_children.items():
             # Get hosts directly or from children
-            hosts = os_group_data.get('hosts', {})
-            
+            hosts = os_group_data.get("hosts", {})
+
             # Also check for nested children (like ollama_ubuntu_servers)
-            for child_name, child_data in os_group_data.get('children', {}).items():
-                hosts.update(child_data.get('hosts', {}))
-            
+            for child_name, child_data in os_group_data.get("children", {}).items():
+                hosts.update(child_data.get("hosts", {}))
+
             # Extract hostname and IP
             for hostname, host_vars in hosts.items():
                 # Clean up hostname for display (remove domain suffix)
-                display_name = hostname.split('.')[0]
+                display_name = hostname.split(".")[0]
                 # Capitalize and clean up for display
-                display_name = display_name.replace('-', ' ').title().replace(' ', '-')
-                
+                display_name = display_name.replace("-", " ").title().replace(" ", "-")
+
                 # Try to get IP from ansible_host var, or resolve hostname
-                ip = host_vars.get('ansible_host', hostname.split('.')[0])
-                
+                ip = host_vars.get("ansible_host", hostname.split(".")[0])
+
                 endpoints[display_name] = ip
                 logger.info(f"Found Ollama host: {display_name} -> {ip}")
-        
+
         if not endpoints:
             logger.warning("No Ollama hosts found in Ansible inventory")
             return load_ollama_endpoints_from_env()
-        
+
         return endpoints
-        
+
     except Exception as e:
         logger.error(f"Error loading Ansible inventory: {e}")
         logger.warning("Falling back to .env configuration")
@@ -116,15 +117,15 @@ def load_ollama_endpoints_from_env():
     Returns dict of {display_name: ip_address}
     """
     endpoints = {}
-    
+
     # Look for OLLAMA_* environment variables
     for key, value in os.environ.items():
-        if key.startswith('OLLAMA_') and key not in ['OLLAMA_PORT']:
+        if key.startswith("OLLAMA_") and key not in ["OLLAMA_PORT"]:
             # Convert OLLAMA_SERVER1 to Server1
-            display_name = key.replace('OLLAMA_', '').replace('_', '-').title()
+            display_name = key.replace("OLLAMA_", "").replace("_", "-").title()
             endpoints[display_name] = value
             logger.info(f"Loaded from env: {display_name} -> {value}")
-    
+
     return endpoints
 
 
@@ -141,7 +142,9 @@ async def ollama_request(host_ip: str, endpoint: str, timeout: int = 5):
     url = f"http://{host_ip}:{OLLAMA_PORT}{endpoint}"
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as response:
+            async with session.get(
+                url, timeout=aiohttp.ClientTimeout(total=timeout)
+            ) as response:
                 if response.status == 200:
                     return await response.json()
                 return None
@@ -157,7 +160,7 @@ async def handle_list_tools() -> list[types.Tool]:
         types.Tool(
             name="get_ollama_status",
             description="Check status of all Ollama instances",
-            inputSchema={"type": "object", "properties": {}}
+            inputSchema={"type": "object", "properties": {}},
         ),
         types.Tool(
             name="get_ollama_models",
@@ -167,113 +170,130 @@ async def handle_list_tools() -> list[types.Tool]:
                 "properties": {
                     "host": {
                         "type": "string",
-                        "description": f"Host: {', '.join(OLLAMA_ENDPOINTS.keys())}"
+                        "description": f"Host: {', '.join(OLLAMA_ENDPOINTS.keys())}",
                     }
                 },
-                "required": ["host"]
-            }
+                "required": ["host"],
+            },
         ),
         types.Tool(
             name="get_litellm_status",
             description="Check LiteLLM proxy status",
-            inputSchema={"type": "object", "properties": {}}
-        )
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
 
 @server.call_tool()
-async def handle_call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
+async def handle_call_tool(
+    name: str, arguments: dict | None
+) -> list[types.TextContent]:
     """Handle tool calls"""
     try:
         if name == "get_ollama_status":
             output = "=== OLLAMA STATUS ===\n\n"
             total_models = 0
             online = 0
-            
+
             for host_name, ip in OLLAMA_ENDPOINTS.items():
                 data = await ollama_request(ip, "/api/tags", timeout=3)
-                
+
                 if data:
-                    models = data.get('models', [])
+                    models = data.get("models", [])
                     count = len(models)
                     total_models += count
                     online += 1
-                    
+
                     output += f"✓ {host_name} ({ip}): {count} models\n"
                     for model in models[:3]:
-                        name = model.get('name', 'Unknown')
-                        size = model.get('size', 0) / (1024**3)
+                        name = model.get("name", "Unknown")
+                        size = model.get("size", 0) / (1024**3)
                         output += f"    - {name} ({size:.1f}GB)\n"
                     if count > 3:
                         output += f"    ... and {count-3} more\n"
                     output += "\n"
                 else:
                     output += f"✗ {host_name} ({ip}): OFFLINE\n\n"
-            
-            output = f"Summary: {online}/{len(OLLAMA_ENDPOINTS)} online, {total_models} models\n\n" + output
+
+            output = (
+                f"Summary: {online}/{len(OLLAMA_ENDPOINTS)} online, {total_models} models\n\n"
+                + output
+            )
             return [types.TextContent(type="text", text=output)]
-        
+
         elif name == "get_ollama_models":
             host = arguments.get("host")
             if host not in OLLAMA_ENDPOINTS:
                 return [types.TextContent(type="text", text=f"Invalid host: {host}")]
-            
+
             ip = OLLAMA_ENDPOINTS[host]
             data = await ollama_request(ip, "/api/tags", timeout=5)
-            
+
             if not data:
                 return [types.TextContent(type="text", text=f"{host} is offline")]
-            
-            models = data.get('models', [])
+
+            models = data.get("models", [])
             output = f"=== {host} ({ip}) ===\n\n"
             output += f"Models: {len(models)}\n\n"
-            
+
             for model in models:
-                name = model.get('name', 'Unknown')
-                size = model.get('size', 0) / (1024**3)
-                modified = model.get('modified_at', 'Unknown')
+                name = model.get("name", "Unknown")
+                size = model.get("size", 0) / (1024**3)
+                modified = model.get("modified_at", "Unknown")
                 output += f"• {name}\n"
                 output += f"  Size: {size:.2f}GB\n"
                 output += f"  Modified: {modified}\n\n"
-            
+
             return [types.TextContent(type="text", text=output)]
-        
+
         elif name == "get_litellm_status":
-            url = f'http://{LITELLM_HOST}:{LITELLM_PORT}/health/liveliness'
+            url = f"http://{LITELLM_HOST}:{LITELLM_PORT}/health/liveliness"
             logger.info(f"Checking LiteLLM at {url}")
-            
+
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    async with session.get(
+                        url, timeout=aiohttp.ClientTimeout(total=5)
+                    ) as response:
                         logger.info(f"LiteLLM response status: {response.status}")
                         if response.status == 200:
-                            data = await response.text()  # Liveliness returns text, not JSON
+                            data = (
+                                await response.text()
+                            )  # Liveliness returns text, not JSON
                             output = f"✓ LiteLLM Proxy: ONLINE\n"
                             output += f"Endpoint: {LITELLM_HOST}:{LITELLM_PORT}\n\n"
                             output += f"Liveliness Check: {data}"
                             return [types.TextContent(type="text", text=output)]
                         else:
-                            return [types.TextContent(
-                                type="text",
-                                text=f"✗ LiteLLM Proxy: HTTP {response.status}\nEndpoint: {url}"
-                            )]
+                            return [
+                                types.TextContent(
+                                    type="text",
+                                    text=f"✗ LiteLLM Proxy: HTTP {response.status}\nEndpoint: {url}",
+                                )
+                            ]
             except asyncio.TimeoutError:
-                return [types.TextContent(
-                    type="text",
-                    text=f"✗ LiteLLM Proxy: TIMEOUT\nEndpoint: {url}\nConnection timed out after 5 seconds"
-                )]
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=f"✗ LiteLLM Proxy: TIMEOUT\nEndpoint: {url}\nConnection timed out after 5 seconds",
+                    )
+                ]
             except aiohttp.ClientConnectorError as e:
-                return [types.TextContent(
-                    type="text",
-                    text=f"✗ LiteLLM Proxy: CONNECTION REFUSED\nEndpoint: {url}\nError: {str(e)}"
-                )]
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=f"✗ LiteLLM Proxy: CONNECTION REFUSED\nEndpoint: {url}\nError: {str(e)}",
+                    )
+                ]
             except Exception as e:
                 logger.error(f"LiteLLM check error: {e}", exc_info=True)
-                return [types.TextContent(
-                    type="text",
-                    text=f"✗ LiteLLM Proxy: ERROR\nEndpoint: {url}\nError: {str(e)}"
-                )]
-        
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=f"✗ LiteLLM Proxy: ERROR\nEndpoint: {url}\nError: {str(e)}",
+                    )
+                ]
+
     except Exception as e:
         return [types.TextContent(type="text", text=f"Error: {str(e)}")]
 
@@ -288,9 +308,9 @@ async def main():
                 server_version="2.0.0",
                 capabilities=server.get_capabilities(
                     notification_options=NotificationOptions(),
-                    experimental_capabilities={}
-                )
-            )
+                    experimental_capabilities={},
+                ),
+            ),
         )
 
 
