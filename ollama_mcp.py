@@ -23,7 +23,7 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
-from mcp_config_loader import load_env_file, COMMON_ALLOWED_ENV_VARS
+from mcp_config_loader import COMMON_ALLOWED_ENV_VARS, load_env_file
 
 server = Server("ollama-info")
 
@@ -35,7 +35,7 @@ ENV_FILE = SCRIPT_DIR / ".env"
 # OLLAMA_* matches OLLAMA_PORT, OLLAMA_SERVER1, OLLAMA_CUSTOM_HOST, etc.
 # LITELLM_* matches all LiteLLM proxy configuration variables
 OLLAMA_ALLOWED_VARS = COMMON_ALLOWED_ENV_VARS | {
-    "OLLAMA_*",  # Pattern: covers OLLAMA_PORT, OLLAMA_SERVER*, etc.
+    "OLLAMA_*",  # Pattern: covers OLLAMA_PORT, OLLAMA_SERVER*, OLLAMA_INVENTORY_GROUP, etc.
     "LITELLM_*",  # Pattern: covers LITELLM_HOST, LITELLM_PORT, etc.
 }
 
@@ -44,6 +44,7 @@ load_env_file(ENV_FILE, allowed_vars=OLLAMA_ALLOWED_VARS, strict=True)
 # Configuration
 ANSIBLE_INVENTORY_PATH = os.getenv("ANSIBLE_INVENTORY_PATH", "")
 OLLAMA_PORT = int(os.getenv("OLLAMA_PORT", "11434"))
+OLLAMA_INVENTORY_GROUP = os.getenv("OLLAMA_INVENTORY_GROUP", "ollama_servers")
 
 # LiteLLM configuration
 LITELLM_HOST = os.getenv("LITELLM_HOST", "localhost")
@@ -69,12 +70,12 @@ def load_ollama_endpoints_from_ansible():
 
         endpoints = {}
 
-        # Navigate through the inventory structure to find ollama_servers group
+        # Navigate through the inventory structure to find Ollama servers group
         all_group = inventory.get("all", {})
         children = all_group.get("children", {})
 
-        # Find ollama_servers group
-        ollama_group = children.get("ollama_servers", {})
+        # Find Ollama servers group (configurable via OLLAMA_INVENTORY_GROUP)
+        ollama_group = children.get(OLLAMA_INVENTORY_GROUP, {})
         ollama_children = ollama_group.get("children", {})
 
         # Process each OS-specific group

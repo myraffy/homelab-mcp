@@ -306,6 +306,10 @@ Monitor and manage Ollama AI model instances across your homelab, plus check you
 ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
 OLLAMA_PORT=11434  # Default Ollama port
 
+# Ansible inventory group name (default: ollama_servers)
+# Change this if you use a different group name in your ansible_hosts.yml
+OLLAMA_INVENTORY_GROUP=ollama_servers
+
 # LiteLLM Configuration
 LITELLM_HOST=192.168.1.100  # Host running LiteLLM proxy
 LITELLM_PORT=4000           # LiteLLM proxy port (default: 4000)
