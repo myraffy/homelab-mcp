@@ -1,0 +1,67 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation (not needed in container)
+*.md
+!README.md
+docs/
+
+# Configuration (should be mounted at runtime)
+.env
+.env.*
+ansible_hosts.yml
+PROJECT_INSTRUCTIONS.md
+CLAUDE.md
+
+# Helpers (not needed for docker/ping servers)
+helpers/
+
+# Other MCP servers (not in this phase)
+ollama_mcp.py
+pihole_mcp.py
+unifi_mcp_optimized.py
+unifi_exporter.py
+ansible_mcp_server.py
+mcp_registry_inspector.py
+
+# Examples
+*.example.*
+.env.example
+ansible_hosts.example.yml
+
+# Tests
+tests/
+test_*
+*_test.py
+
+# CI/CD
+.github/
+CI_CD_CHECKS.md
+
+# Security docs (already in README)
+SECURITY.md
+CONTEXT_AWARE_SECURITY.md
+CONTRIBUTING.md
+CHANGELOG.md
