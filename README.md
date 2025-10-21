@@ -213,6 +213,77 @@ pip install -r requirements.txt
 - Paste into your Claude project's "Project instructions" field
 - This gives Claude comprehensive context about your MCP capabilities
 
+
+## 🐳 Docker Deployment (Alternative)
+
+Run the MCP servers in Docker containers for easier distribution and isolation.
+
+### Quick Start with Docker
+```bash
+# Clone and navigate to repository
+git clone https://github.com/bjeans/homelab-mcp
+cd homelab-mcp
+
+# Build the image
+docker build -t homelab-mcp:latest .
+
+# Run with Docker Compose (recommended)
+docker-compose up -d
+
+# Or run individual server
+docker run -d \
+  --name homelab-mcp-docker \
+  --network host \
+  -e ENABLED_SERVERS=docker \
+  -v $(pwd)/ansible_hosts.yml:/config/ansible_hosts.yml:ro \
+  homelab-mcp:latest
+```
+
+### Currently Available in Docker
+
+**Phase 1 (Current):**
+- ✅ `docker` - Docker/Podman container management
+- ✅ `ping` - Network ping utilities
+
+**Coming Soon:**
+- 🔄 Ollama, Pi-hole, Unifi servers (Phase 2)
+- 🔄 Ansible inventory server (Phase 3)
+
+### Docker Configuration
+
+**Two configuration methods supported:**
+
+1. **Ansible Inventory (Recommended)** - Mount as volume
+2. **Environment Variables** - Pass via Docker `-e` flags
+
+See [DOCKER.md](DOCKER.md) for comprehensive Docker deployment guide including:
+- Detailed setup instructions
+- Network configuration options
+- Security best practices
+- Claude Desktop integration
+- Troubleshooting common issues
+
+### Integration with Claude Desktop
+
+Configure Claude Desktop to use the containerized servers:
+```json
+{
+  "mcpServers": {
+    "homelab-docker": {
+      "command": "docker",
+      "args": ["exec", "-i", "homelab-mcp-docker", "python", "docker_mcp_podman.py"]
+    },
+    "homelab-ping": {
+      "command": "docker",
+      "args": ["exec", "-i", "homelab-mcp-ping", "python", "ping_mcp_server.py"]
+    }
+  }
+}
+```
+
+**Important:** Use `docker exec -i` (not `-it`) for proper MCP stdio communication.
+
+
 ## 📦 Available MCP Servers
 
 ### MCP Registry Inspector
