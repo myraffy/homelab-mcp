@@ -1,0 +1,44 @@
+services:
+  # Docker MCP Server
+  homelab-mcp-docker:
+    build: .
+    container_name: homelab-mcp-docker
+    environment:
+      - ENABLED_SERVERS=docker
+      # Option 1: Use Ansible Inventory (recommended)
+      - ANSIBLE_INVENTORY_PATH=/config/ansible_hosts.yml
+      # Option 2: Use Environment Variables (uncomment if not using Ansible)
+      # - DOCKER_SERVER1_ENDPOINT=192.168.1.100:2375
+      # - DOCKER_SERVER2_ENDPOINT=192.168.1.101:2375
+      # - PODMAN_SERVER1_ENDPOINT=192.168.1.102:8080
+    volumes:
+      # Mount your Ansible inventory (if using)
+      - ./ansible_hosts.yml:/config/ansible_hosts.yml:ro
+    network_mode: host  # Required to access homelab Docker APIs
+    restart: unless-stopped
+    stdin_open: true   # Required for MCP stdio communication
+    tty: true          # Required for MCP stdio communication
+
+  # Ping MCP Server
+  homelab-mcp-ping:
+    build: .
+    container_name: homelab-mcp-ping
+    environment:
+      - ENABLED_SERVERS=ping
+      # Option 1: Use Ansible Inventory (recommended)
+      - ANSIBLE_INVENTORY_PATH=/config/ansible_hosts.yml
+      # Option 2: Use Environment Variables (uncomment if not using Ansible)
+      # - PING_TARGET1=192.168.1.1
+      # - PING_TARGET2=192.168.1.100
+    volumes:
+      # Mount your Ansible inventory (if using)
+      - ./ansible_hosts.yml:/config/ansible_hosts.yml:ro
+    network_mode: host  # Required for ICMP ping
+    restart: unless-stopped
+    stdin_open: true   # Required for MCP stdio communication
+    tty: true          # Required for MCP stdio communication
+    cap_add:
+      - NET_RAW        # Required for ICMP ping operations
+
+# Note: MCP servers communicate over stdio, not network ports
+# Each service runs independently and connects to Claude Desktop via stdio
