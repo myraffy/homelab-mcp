@@ -38,14 +38,6 @@ CLAUDE.md
 # Helpers (not needed for docker/ping servers)
 helpers/
 
-# Other MCP servers (not in this phase)
-ollama_mcp.py
-pihole_mcp.py
-unifi_mcp_optimized.py
-unifi_exporter.py
-ansible_mcp_server.py
-mcp_registry_inspector.py
-
 # Examples
 *.example.*
 .env.example

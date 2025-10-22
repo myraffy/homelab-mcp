@@ -24,7 +24,7 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
-from mcp_config_loader import load_env_file, COMMON_ALLOWED_ENV_VARS
+from mcp_config_loader import load_env_file, load_indexed_env_vars, COMMON_ALLOWED_ENV_VARS
 
 server = Server("docker-info")
 
@@ -106,22 +106,101 @@ def load_container_hosts_from_env():
     """
     Fallback: Load container hosts from environment variables
     Returns dict of {hostname: {'endpoint': 'ip:port', 'runtime': 'docker|podman'}}
+    
+    Supports two patterns:
+    1. Indexed: DOCKER_SERVER1_ENDPOINT, DOCKER_SERVER1_NAME
+    2. Named: DOCKER_CYBER_ENDPOINT, PODMAN_HL15_ENDPOINT
     """
     container_hosts = {}
-
-    # Look for DOCKER_* environment variables
+    
+    # Pattern 1: Indexed servers (DOCKER_SERVER1_ENDPOINT, PODMAN_HL15_ENDPOINT)
+    # Load Docker servers using generic function
+    docker_servers = load_indexed_env_vars(
+        prefix="DOCKER_",
+        name_suffix="_NAME",
+        target_suffix="_ENDPOINT",
+        logger_obj=logger
+    )
+    
+    for index, server_info in docker_servers.items():
+        endpoint = server_info["target"]
+        name = server_info["name"]
+        
+        if not endpoint:
+            continue
+        
+        display_name = name if name else f"docker-server{index}".lower()
+        container_hosts[display_name] = {"endpoint": endpoint, "runtime": "docker"}
+        logger.info(f"Loaded Docker from env: {display_name} -> {endpoint}")
+    
+    # Load Podman servers using generic function
+    podman_servers = load_indexed_env_vars(
+        prefix="PODMAN_",
+        name_suffix="_NAME",
+        target_suffix="_ENDPOINT",
+        logger_obj=logger
+    )
+    
+    for index, server_info in podman_servers.items():
+        endpoint = server_info["target"]
+        name = server_info["name"]
+        
+        if not endpoint:
+            continue
+        
+        display_name = name if name else f"podman-server{index}".lower()
+        
+        # Skip unnamed indexed entries if the same endpoint will be loaded by Pattern 2
+        # with a better display name (e.g., skip "podman-server15" if "hl15" will be loaded)
+        if not name:
+            # Check if there's a named PODMAN_*_ENDPOINT that has the same value
+            for env_key, env_value in os.environ.items():
+                if env_key.startswith("PODMAN_") and env_key.endswith("_ENDPOINT") and env_value == endpoint:
+                    middle = env_key[7:-9]
+                    # Only skip if it's a named pattern (not purely numeric)
+                    if middle and not middle.isdigit():
+                        logger.debug(f"Skipping podman-server{index} (using {middle.lower()} instead)")
+                        break
+            else:
+                # No better name found, use the indexed name
+                container_hosts[display_name] = {"endpoint": endpoint, "runtime": "podman"}
+                logger.info(f"Loaded Podman from env: {display_name} -> {endpoint}")
+                continue
+            continue
+        
+        container_hosts[display_name] = {"endpoint": endpoint, "runtime": "podman"}
+        logger.info(f"Loaded Podman from env: {display_name} -> {endpoint}")
+    
+    # Pattern 2: Named servers (DOCKER_CYBER_ENDPOINT, PODMAN_HL15_ENDPOINT)
+    # These are non-indexed named servers from .env configuration
     for key, value in os.environ.items():
+        # Match DOCKER_*_ENDPOINT pattern
         if key.startswith("DOCKER_") and key.endswith("_ENDPOINT"):
-            # Convert DOCKER_SERVER1_ENDPOINT to server1
-            display_name = key.replace("DOCKER_", "").replace("_ENDPOINT", "").lower()
-            container_hosts[display_name] = {"endpoint": value, "runtime": "docker"}
-            logger.info(f"Loaded Docker from env: {display_name} -> {value}")
-
+            # Extract the middle part (e.g., DOCKER_CYBER_ENDPOINT -> CYBER)
+            middle = key[7:-9]  # Remove "DOCKER_" prefix and "_ENDPOINT" suffix
+            
+            # Skip indexed patterns (they should have been caught above)
+            if middle and middle.isdigit():
+                continue
+            
+            display_name = middle.lower() if middle else "docker"
+            if display_name not in container_hosts:
+                container_hosts[display_name] = {"endpoint": value, "runtime": "docker"}
+                logger.info(f"Loaded Docker from env: {display_name} -> {value}")
+        
+        # Match PODMAN_*_ENDPOINT pattern
         elif key.startswith("PODMAN_") and key.endswith("_ENDPOINT"):
-            # Convert PODMAN_SERVER1_ENDPOINT to server1
-            display_name = key.replace("PODMAN_", "").replace("_ENDPOINT", "").lower()
-            container_hosts[display_name] = {"endpoint": value, "runtime": "podman"}
-            logger.info(f"Loaded Podman from env: {display_name} -> {value}")
+            # Extract the middle part (e.g., PODMAN_HL15_ENDPOINT -> HL15)
+            middle = key[7:-9]  # Remove "PODMAN_" prefix and "_ENDPOINT" suffix
+            
+            # Skip if it's purely numeric (indexed pattern)
+            if middle and middle.isdigit():
+                continue
+            
+            display_name = middle.lower() if middle else "podman"
+            if display_name not in container_hosts:
+                container_hosts[display_name] = {"endpoint": value, "runtime": "podman"}
+                logger.info(f"Loaded Podman from env: {display_name} -> {value}")
 
     return container_hosts
 

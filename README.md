@@ -283,6 +283,35 @@ Configure Claude Desktop to use the containerized servers:
 
 **Important:** Use `docker exec -i` (not `-it`) for proper MCP stdio communication.
 
+### Testing Docker Containers
+
+**Quick verification test (using environment variables - marketplace ready):**
+
+```bash
+# Test Ping Server
+docker run --rm --network host \
+    -e ENABLED_SERVERS=ping \
+    -e PING_TARGET1=8.8.8.8 \
+    -e PING_TARGET1_NAME=Google-DNS \
+    homelab-mcp:latest
+
+# Test Docker Server
+docker run --rm --network host \
+    -e ENABLED_SERVERS=docker \
+    -e DOCKER_SERVER1_ENDPOINT=localhost:2375 \
+    -e DOCKER_SERVER1_NAME=Local-Docker \
+    homelab-mcp:latest
+```
+
+**Docker Compose testing:**
+
+```bash
+docker-compose up -d
+docker-compose logs -f
+```
+
+For comprehensive testing and configuration options, see [DOCKER.md - Testing Section](DOCKER.md#testing).
+
 
 ## 📦 Available MCP Servers
 

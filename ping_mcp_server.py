@@ -32,7 +32,7 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
-from mcp_config_loader import load_env_file, COMMON_ALLOWED_ENV_VARS
+from mcp_config_loader import load_env_file, load_indexed_env_vars, COMMON_ALLOWED_ENV_VARS
 
 server = Server("ping-info")
 
@@ -54,14 +54,69 @@ logger.info(f"Ansible inventory: {ANSIBLE_INVENTORY_PATH}")
 INVENTORY_DATA = None
 
 
+def load_ping_targets_from_env():
+    """
+    Fallback: Load ping targets from environment variables.
+    Returns dict with hosts and groups in same format as Ansible inventory.
+    
+    Expects environment variables like:
+    - PING_TARGET1=8.8.8.8
+    - PING_TARGET1_NAME=Google-DNS
+    - PING_TARGET2=1.1.1.1
+    - PING_TARGET2_NAME=Cloudflare-DNS
+    """
+    # Use generic function to parse indexed environment variables
+    indexed_targets = load_indexed_env_vars(
+        prefix="PING_TARGET",
+        name_suffix="_NAME",
+        target_suffix="",
+        logger_obj=logger
+    )
+    
+    # Convert generic format to Ansible-like format
+    hosts = {}
+    for index, target_info in indexed_targets.items():
+        target = target_info["target"]
+        name = target_info["name"]
+        
+        if not target:
+            logger.warning(f"PING_TARGET{index} name defined but no target IP/hostname provided")
+            continue
+        
+        # Use provided name or derive from target
+        hostname = name if name else f"ping-target-{index}"
+        
+        hosts[hostname] = {
+            "groups": ["env_targets"],
+            "vars": {
+                "ansible_host": target
+            }
+        }
+        logger.info(f"Added ping target: {hostname} ({target})")
+    
+    if not hosts:
+        logger.warning("No ping targets found in environment variables")
+        return {"hosts": {}, "groups": {}}
+    
+    logger.info(f"Loaded {len(hosts)} ping targets from environment variables")
+    
+    # Return in same format as Ansible inventory
+    return {
+        "hosts": hosts,
+        "groups": {"env_targets": list(hosts.keys())}
+    }
+
+
 def load_ansible_inventory():
     """
-    Load and cache the Ansible inventory with full variable inheritance
-    Returns dict with hosts and groups
+    Load and cache the Ansible inventory with full variable inheritance.
+    Falls back to environment variables if Ansible inventory not found.
+    Returns dict with hosts and groups.
 
     Properly merges variables from:
     1. Group vars (from parent to child)
     2. Host vars (override group vars)
+    3. Environment variables (fallback)
     """
     global INVENTORY_DATA
 
@@ -69,7 +124,13 @@ def load_ansible_inventory():
         return INVENTORY_DATA
 
     if not ANSIBLE_INVENTORY_PATH or not Path(ANSIBLE_INVENTORY_PATH).exists():
-        logger.error(f"Ansible inventory not found at: {ANSIBLE_INVENTORY_PATH}")
+        logger.warning(f"Ansible inventory not found at: {ANSIBLE_INVENTORY_PATH}")
+        logger.info("Attempting to load ping targets from environment variables")
+        INVENTORY_DATA = load_ping_targets_from_env()
+        if INVENTORY_DATA and INVENTORY_DATA.get("hosts"):
+            logger.info(f"Loaded {len(INVENTORY_DATA['hosts'])} ping targets from environment")
+            return INVENTORY_DATA
+        logger.error("No ping targets configured in Ansible inventory or environment variables")
         return {"hosts": {}, "groups": {}}
 
     try:
@@ -168,6 +229,11 @@ def load_ansible_inventory():
 
     except Exception as e:
         logger.error(f"Error loading Ansible inventory: {e}", exc_info=True)
+        logger.info("Attempting to load ping targets from environment variables as fallback")
+        INVENTORY_DATA = load_ping_targets_from_env()
+        if INVENTORY_DATA and INVENTORY_DATA.get("hosts"):
+            logger.info(f"Loaded {len(INVENTORY_DATA['hosts'])} ping targets from environment variables")
+            return INVENTORY_DATA
         return {"hosts": {}, "groups": {}}
 
 

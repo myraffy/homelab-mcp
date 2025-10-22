@@ -7,6 +7,7 @@ Handles .env file loading with security hardening and allowlist validation
 import fnmatch
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Dict, Optional, Set
 
@@ -153,9 +154,95 @@ def get_config(
     return os.getenv(key, default)
 
 
+def load_indexed_env_vars(
+    prefix: str,
+    name_suffix: str = "_NAME",
+    target_suffix: str = "",
+    logger_obj = None,
+) -> dict:
+    """
+    Load indexed environment variables into a structured dict.
+    
+    Supports patterns like:
+    - PING_TARGET1=value, PING_TARGET1_NAME=display_name
+    - DOCKER_SERVER1_ENDPOINT=value, DOCKER_SERVER1_NAME=display_name (extracts "1" from "SERVER1")
+    
+    Args:
+        prefix: Variable name prefix (e.g., "PING_TARGET", "DOCKER_", "PODMAN_")
+        name_suffix: Suffix for display name variable (default: "_NAME")
+        target_suffix: Suffix for target/endpoint variable (default: "" means no suffix)
+        logger_obj: Optional logger instance for logging (uses print if None)
+    
+    Returns:
+        Dict with structure:
+        {
+            "index": {
+                "name": "display_name or None",
+                "target": "value or None"
+            }
+        }
+        Indexed items are sorted by numeric index.
+    
+    Example:
+        result = load_indexed_env_vars("PING_TARGET", name_suffix="_NAME")
+        # With PING_TARGET1=8.8.8.8, PING_TARGET1_NAME=Google
+        # Returns: {"1": {"name": "Google", "target": "8.8.8.8"}}
+        
+        result = load_indexed_env_vars("DOCKER_", name_suffix="_NAME", target_suffix="_ENDPOINT")
+        # With DOCKER_SERVER1_ENDPOINT=192.168.1.100:2375, DOCKER_SERVER1_NAME=MyDocker
+        # Returns: {"1": {"name": "MyDocker", "target": "192.168.1.100:2375"}}
+    """
+    targets_by_index = {}
+    
+    log = logger_obj.info if logger_obj else print
+    log_warning = logger_obj.warning if logger_obj else print
+    
+    # Collect all matching environment variables
+    for key, value in os.environ.items():
+        if not key.startswith(prefix):
+            continue
+        
+        # Extract suffix after prefix
+        suffix = key[len(prefix):]
+        
+        # Extract numeric index from the suffix (handles patterns like SERVER1_NAME, SERVER1_ENDPOINT, 1, etc.)
+        # Look for the first consecutive digits in the suffix
+        index_match = re.search(r'(\d+)', suffix)
+        if not index_match:
+            continue
+        
+        index = index_match.group(1)
+        
+        # Check for _NAME suffix
+        if suffix.endswith(name_suffix):
+            targets_by_index.setdefault(index, {"name": None, "target": None})
+            targets_by_index[index]["name"] = value
+            log(f"Found {prefix}*{index}{name_suffix}: {value}")
+        
+        # Check for target/value with target_suffix (if specified)
+        elif target_suffix and suffix.endswith(target_suffix):
+            targets_by_index.setdefault(index, {"name": None, "target": None})
+            targets_by_index[index]["target"] = value
+            log(f"Loaded {prefix}*{index}{target_suffix}: {value}")
+        
+        # Check for plain value (no suffix required)
+        elif not target_suffix and not suffix.endswith(name_suffix):
+            targets_by_index.setdefault(index, {"name": None, "target": None})
+            targets_by_index[index]["target"] = value
+            log(f"Loaded {prefix}*{index}: {value}")
+    
+    # Sort by numeric index
+    sorted_targets = {}
+    for index in sorted(targets_by_index.keys(), key=lambda x: int(x)):
+        sorted_targets[index] = targets_by_index[index]
+    
+    return sorted_targets
+
+
 __all__ = [
     "load_env_file",
     "is_valid_env_var_name",
     "get_config",
+    "load_indexed_env_vars",
     "COMMON_ALLOWED_ENV_VARS",
 ]

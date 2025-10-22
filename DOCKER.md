@@ -2,6 +2,8 @@
 
 This guide covers deploying the Homelab MCP servers using Docker containers.
 
+> **For Docker MCP Marketplace:** This image is marketplace-ready! Configure it entirely via environment variables with no external dependencies. See [Configuration Methods](#configuration-methods) below.
+
 ## Quick Start
 
 ### Prerequisites
@@ -177,7 +179,32 @@ iptables -A INPUT -p tcp --dport 2375 -j DROP
 
 ## Integration with Claude Desktop
 
-### Configuration
+### Configuration Overview
+
+The Docker containers can be configured two ways:
+
+1. **Environment Variables (Recommended for Marketplace)** - No external files needed
+2. **Ansible Inventory Volume Mount** - For advanced setups with many hosts
+
+### Option 1: Environment Variables (Minimal Dependencies)
+
+This approach requires no external files - everything is passed as environment variables. **Best for Docker MCP marketplace distribution.**
+
+**Step 1: Start the container**
+
+```bash
+# Docker Compose approach
+docker-compose up -d
+
+# Or manually:
+docker run -d --name homelab-mcp-docker --network host \
+  -e ENABLED_SERVERS=docker \
+  -e DOCKER_SERVER1_ENDPOINT=192.168.1.100:2375 \
+  -e DOCKER_SERVER2_ENDPOINT=192.168.1.101:2375 \
+  homelab-mcp:latest
+```
+
+**Step 2: Configure Claude Desktop**
 
 Edit Claude Desktop config file:
 
@@ -185,7 +212,6 @@ Edit Claude Desktop config file:
 **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Linux:** `~/.config/Claude/claude_desktop_config.json`
 
-### Using Docker Container
 ```json
 {
   "mcpServers": {
@@ -213,14 +239,26 @@ Edit Claude Desktop config file:
 }
 ```
 
-**Important:** 
-- Use `docker exec -i` (not `-it`)
-- The `-i` flag enables stdin for MCP communication
+### Option 2: Ansible Inventory Volume Mount (Advanced)
+
+For complex setups with many hosts, mount an Ansible inventory file:
+
+```bash
+docker run -d --name homelab-mcp-docker --network host \
+  -e ENABLED_SERVERS=docker \
+  -e ANSIBLE_INVENTORY_PATH=/config/ansible_hosts.yml \
+  -v $(pwd)/ansible_hosts.yml:/config/ansible_hosts.yml:ro \
+  homelab-mcp:latest
+```
+
+See [Configuration section](#configuration) above for details.
+
+### Important Notes
+
+- **Use `docker exec -i`** (not `-it`) for proper MCP stdio communication
 - Do NOT use `-t` (tty) as it interferes with MCP protocol
-
-### Restart Claude Desktop
-
-Completely restart Claude Desktop after configuration changes.
+- Container must be running before Claude tries to connect
+- Restart Claude Desktop completely after configuration changes
 
 ## Troubleshooting
 
@@ -292,9 +330,101 @@ docker buildx build \
   .
 ```
 
+## Testing
+
+### Quick Verification Test
+
+Test the Docker image quickly with these commands:
+
+**Test Ping Server:**
+
+```bash
+# PowerShell
+docker run --rm --network host `
+    -e ENABLED_SERVERS=ping `
+    -e ANSIBLE_INVENTORY_PATH=/config/ansible_hosts.yml `
+    -v "$PWD/ansible_hosts.yml:/config/ansible_hosts.yml:ro" `
+    homelab-mcp:latest
+
+# Bash
+docker run --rm --network host \
+    -e ENABLED_SERVERS=ping \
+    -e ANSIBLE_INVENTORY_PATH=/config/ansible_hosts.yml \
+    -v $(pwd)/ansible_hosts.yml:/config/ansible_hosts.yml:ro \
+    homelab-mcp:latest
+```
+
+**Test Docker Server:**
+
+```bash
+# PowerShell
+docker run --rm --network host `
+    -e ENABLED_SERVERS=docker `
+    -e ANSIBLE_INVENTORY_PATH=/config/ansible_hosts.yml `
+    -v "$PWD/ansible_hosts.yml:/config/ansible_hosts.yml:ro" `
+    homelab-mcp:latest
+
+# Bash
+docker run --rm --network host \
+    -e ENABLED_SERVERS=docker \
+    -e ANSIBLE_INVENTORY_PATH=/config/ansible_hosts.yml \
+    -v $(pwd)/ansible_hosts.yml:/config/ansible_hosts.yml:ro \
+    homelab-mcp:latest
+```
+
+**Expected Output:**
+
+- Server starts with "Starting Homelab MCP Servers..."
+- Ansible inventory is loaded from `/config/ansible_hosts.yml`
+- Hosts/endpoints are discovered (e.g., "Found Docker host:", "Loaded X hosts")
+- No error messages
+
+### Docker Compose Testing
+
+Start all services and view logs:
+
+```bash
+docker-compose up -d
+docker-compose logs -f homelab-mcp-docker
+docker-compose logs -f homelab-mcp-ping
+```
+
+### Claude Desktop Integration Testing
+
+1. Start containers with Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+1. Update Claude Desktop config (`%APPDATA%\Claude\claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "homelab-mcp-docker": {
+      "command": "docker",
+      "args": ["exec", "-i", "homelab-mcp-docker", "python", "docker_mcp_podman.py"]
+    },
+    "homelab-mcp-ping": {
+      "command": "docker",
+      "args": ["exec", "-i", "homelab-mcp-ping", "python", "ping_mcp_server.py"]
+    }
+  }
+}
+```
+
+1. Restart Claude Desktop completely
+
+1. Test in Claude:
+   - Ask: "What tools are available from homelab-mcp-docker?"
+   - Ask: "Can you list the Docker containers on my servers?"
+   - Ask: "Ping 192.168.1.1 for me"
+
 ## Health Checks
 
 The container includes health checks:
+
 ```bash
 # Check container health
 docker inspect homelab-mcp-docker | grep -A 10 Health

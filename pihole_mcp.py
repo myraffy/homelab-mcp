@@ -104,31 +104,43 @@ def load_pihole_hosts_from_env():
     """
     Fallback: Load Pi-hole hosts from environment variables
     Returns list of tuples: [(display_name, host, port, api_key), ...]
+    
+    BUG FIX (2025-10-21): Look for direct environment variables passed via -e flags
+    The function now directly iterates os.environ to find PIHOLE_*_HOST and PIHOLE_API_KEY_* 
+    variables, matching the pattern used in ollama_mcp.py for better container compatibility.
     """
     pihole_hosts = []
-
-    # Look for PIHOLE_*_HOST environment variables
     processed_names = set()
-    for key in os.environ.keys():
+
+    # Look for PIHOLE_*_HOST environment variables (direct env vars, not just .env)
+    for key, value in os.environ.items():
         if key.startswith("PIHOLE_") and key.endswith("_HOST"):
-            # Extract name: PIHOLE_SERVER1_HOST -> SERVER1
+            # Extract name: PIHOLE_DELL_HOST -> DELL
             name_part = key.replace("PIHOLE_", "").replace("_HOST", "")
 
             if name_part in processed_names:
                 continue
             processed_names.add(name_part)
 
-            # Get corresponding values
-            host = os.getenv(f"PIHOLE_{name_part}_HOST", "")
-            port = int(os.getenv(f"PIHOLE_{name_part}_PORT", "80"))
-            api_key = os.getenv(f"PIHOLE_API_KEY_{name_part}", "")
+            # Get corresponding values from os.environ directly
+            host = os.environ.get(f"PIHOLE_{name_part}_HOST", "")
+            port_str = os.environ.get(f"PIHOLE_{name_part}_PORT", "80")
+            api_key = os.environ.get(f"PIHOLE_API_KEY_{name_part}", "")
+            
+            try:
+                port = int(port_str)
+            except (ValueError, TypeError):
+                port = 80
+                logger.warning(f"Invalid port '{port_str}' for {name_part}, using default 80")
 
             # Format display name
             display_name = name_part.replace("_", "-").title()
 
             if host:
                 pihole_hosts.append((display_name, host, port, api_key))
-                logger.info(f"Loaded from env: {display_name} -> {host}:{port}")
+                logger.info(f"Loaded from env: {display_name} -> {host}:{port} (api_key: {'***' if api_key else 'NOT SET'})")
+            else:
+                logger.warning(f"PIHOLE_{name_part}_HOST is empty, skipping")
 
     return pihole_hosts
 

@@ -33,6 +33,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy MCP server files
 COPY --chown=mcpuser:mcpuser docker_mcp_podman.py .
 COPY --chown=mcpuser:mcpuser ping_mcp_server.py .
+COPY --chown=mcpuser:mcpuser ollama_mcp.py .
+COPY --chown=mcpuser:mcpuser pihole_mcp.py .
+COPY --chown=mcpuser:mcpuser unifi_mcp_optimized.py .
+COPY --chown=mcpuser:mcpuser mcp_registry_inspector.py .
+COPY --chown=mcpuser:mcpuser unifi_exporter.py .
 COPY --chown=mcpuser:mcpuser mcp_config_loader.py .
 
 # Copy entrypoint script

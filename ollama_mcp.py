@@ -116,6 +116,11 @@ def load_ollama_endpoints_from_env():
     """
     Fallback: Load Ollama endpoints from environment variables
     Returns dict of {display_name: ip_address}
+    
+    BUG FIX (2025-10-21): Strip port numbers from env var values
+    Environment variables may include ports (e.g., "192.168.1.100:11434")
+    but the port is added separately in ollama_request() via OLLAMA_PORT config.
+    Without stripping, URLs would have double ports (e.g., :11434:11434)
     """
     endpoints = {}
 
@@ -124,8 +129,14 @@ def load_ollama_endpoints_from_env():
         if key.startswith("OLLAMA_") and key not in ["OLLAMA_PORT"]:
             # Convert OLLAMA_SERVER1 to Server1
             display_name = key.replace("OLLAMA_", "").replace("_", "-").title()
-            endpoints[display_name] = value
-            logger.info(f"Loaded from env: {display_name} -> {value}")
+            # Strip port if included (e.g., "192.168.1.100:11434" -> "192.168.1.100")
+            # Port is added separately in ollama_request() via OLLAMA_PORT config
+            ip_only = value.split(":")[0] if ":" in value else value  # ✓ Strip port
+            endpoints[display_name] = ip_only
+            if ip_only != value:
+                logger.info(f"Loaded from env: {display_name} -> {ip_only} (stripped port from {value})")
+            else:
+                logger.info(f"Loaded from env: {display_name} -> {ip_only}")
 
     return endpoints
 
