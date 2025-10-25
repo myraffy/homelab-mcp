@@ -46,8 +46,8 @@ CLAUDE_CONFIG_PATH = Path(
 
 MCP_DIRECTORY = Path(os.getenv("MCP_DIRECTORY", str(SCRIPT_DIR)))
 
-logger.info(f"Claude config path: {CLAUDE_CONFIG_PATH}")
-logger.info(f"MCP directory: {MCP_DIRECTORY}")
+logger.debug(f"Claude config path: {CLAUDE_CONFIG_PATH}")
+logger.debug(f"MCP directory: {MCP_DIRECTORY}")
 
 server = Server("mcp-registry-inspector")
 

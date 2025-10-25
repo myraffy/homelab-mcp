@@ -2,10 +2,36 @@
 set -e
 
 # Homelab MCP Container Entrypoint
-# Launches specified MCP servers based on ENABLED_SERVERS environment variable
+# Supports two modes:
+# 1. Unified mode (default): Runs homelab_unified_mcp.py with all servers
+# 2. Legacy mode: Runs individual server specified in ENABLED_SERVERS
 # NOTE: All diagnostic output goes to stderr to keep stdout clean for MCP protocol
 
-echo "Starting Homelab MCP Servers..." >&2
+echo "Starting Homelab MCP..." >&2
+
+# Check if Ansible inventory is being used
+if [ -f "$ANSIBLE_INVENTORY_PATH" ]; then
+    echo "Using Ansible inventory: $ANSIBLE_INVENTORY_PATH" >&2
+else
+    echo "No Ansible inventory found at $ANSIBLE_INVENTORY_PATH, using environment variables" >&2
+fi
+
+# Determine mode: Unified (default) or Legacy
+if [ -z "$ENABLED_SERVERS" ]; then
+    # Unified mode - run all servers together
+    echo "Mode: UNIFIED (all servers in one process)" >&2
+    if [ -f "homelab_unified_mcp.py" ]; then
+        echo "Starting Unified Homelab MCP Server..." >&2
+        echo "Available tools: docker_*, ping_*, ollama_*, pihole_*, unifi_*" >&2
+        exec python homelab_unified_mcp.py
+    else
+        echo "ERROR: homelab_unified_mcp.py not found" >&2
+        exit 1
+    fi
+fi
+
+# Legacy mode - run individual server
+echo "Mode: LEGACY (individual server)" >&2
 echo "Enabled servers: ${ENABLED_SERVERS}" >&2
 
 # Parse ENABLED_SERVERS (comma-separated list)
@@ -16,13 +42,6 @@ if [ ${#SERVERS[@]} -eq 0 ]; then
     echo "ERROR: No servers enabled. Set ENABLED_SERVERS environment variable." >&2
     echo "Example: ENABLED_SERVERS=docker,ping,ollama,pihole,unifi,registry" >&2
     exit 1
-fi
-
-# Check if Ansible inventory is being used
-if [ -f "$ANSIBLE_INVENTORY_PATH" ]; then
-    echo "Using Ansible inventory: $ANSIBLE_INVENTORY_PATH" >&2
-else
-    echo "No Ansible inventory found at $ANSIBLE_INVENTORY_PATH, using environment variables" >&2
 fi
 
 # Function to start MCP server

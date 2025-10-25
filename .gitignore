@@ -21,6 +21,9 @@ __pycache__/
 *$py.class
 *.so
 
+# Node modules
+node_modules/
+
 # Virtual environments
 venv/
 env/
@@ -52,3 +55,9 @@ test_*.py
 
 # Archive directory
 archive-ignore/
+
+# Snyk Security Extension - AI Rules (auto-generated)
+.github/instructions/snyk_rules.instructions.md
+
+#backup files
+*.bak*

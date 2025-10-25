@@ -29,13 +29,15 @@ See [SECURITY.md](SECURITY.md) for comprehensive security guidance.
 This project includes several documentation files for different audiences:
 
 - **[README.md](README.md)** (this file) - Installation, setup, and usage guide
+- **[MIGRATION.md](MIGRATION.md)** - Migration guide for v2.0 unified server
 - **[PROJECT_INSTRUCTIONS.md](PROJECT_INSTRUCTIONS.example.md)** - Copy into Claude project instructions for AI context
 - **[CLAUDE.md](CLAUDE.example.md)** - Developer guide for AI assistants and contributors
-- **[SECURITY.md](SECURITY.md)** - Security policies and best practices  
+- **[SECURITY.md](SECURITY.md)** - Security policies and best practices
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute to this project
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
 
 **👥 For End Users:** Follow this README + copy PROJECT_INSTRUCTIONS.md to Claude
+**🔄 Migrating from v1.x?** See [MIGRATION.md](MIGRATION.md) for unified server migration
 **🤖 For AI Assistants:** Read [CLAUDE.md](CLAUDE.example.md) for complete development context
 **🔧 For Contributors:** Start with CONTRIBUTING.md and [CLAUDE.md](CLAUDE.example.md)
 
@@ -83,6 +85,59 @@ After setting up the MCP servers, **create your personalized project instruction
 - Troubleshooting and development guidance
 
 This README covers installation and basic setup. The project instructions provide Claude with comprehensive usage context.
+
+## 🎯 Deployment Options
+
+**Version 2.0+** offers two deployment modes:
+
+### Unified Server (Recommended for New Deployments)
+
+Run all MCP servers in a single process with namespaced tools:
+
+```json
+{
+  "mcpServers": {
+    "homelab-unified": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\homelab_unified_mcp.py"]
+    }
+  }
+}
+```
+
+**Advantages:**
+- ✅ Single configuration entry
+- ✅ One Python process for all servers
+- ✅ Better Docker deployment
+- ✅ Cleaner logs (no duplicate warnings)
+- ✅ All tools namespaced (e.g., `docker_get_containers`, `ping_ping_host`)
+
+### Individual Servers (Legacy, Fully Supported)
+
+Run each MCP server as a separate process:
+
+```json
+{
+  "mcpServers": {
+    "docker": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\docker_mcp_podman.py"]
+    },
+    "ollama": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\ollama_mcp.py"]
+    }
+  }
+}
+```
+
+**Advantages:**
+- ✅ Granular control over each server
+- ✅ Can enable/disable servers individually
+- ✅ Original tool names (e.g., `get_docker_containers`, `ping_host`)
+- ✅ Backward compatible with v1.x
+
+**Migration Guide:** See [MIGRATION.md](MIGRATION.md) for detailed migration instructions and tool name changes.
 
 ## 🚀 Quick Start
 
@@ -172,7 +227,32 @@ pip install -r requirements.txt
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
-**Add the MCP servers:**
+**Option A: Unified Server (Recommended)**
+
+Single entry for all homelab servers:
+
+```json
+{
+  "mcpServers": {
+    "homelab-unified": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\homelab_unified_mcp.py"]
+    },
+    "mcp-registry-inspector": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\mcp_registry_inspector.py"]
+    },
+    "ansible-inventory": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\ansible_mcp_server.py"]
+    }
+  }
+}
+```
+
+**Option B: Individual Servers (Legacy)**
+
+Separate entry for each server:
 
 ```json
 {
@@ -197,6 +277,10 @@ pip install -r requirements.txt
       "command": "python",
       "args": ["C:\\Path\\To\\Homelab-MCP\\unifi_mcp_optimized.py"]
     },
+    "ping": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\ping_mcp_server.py"]
+    },
     "ansible-inventory": {
       "command": "python",
       "args": ["C:\\Path\\To\\Homelab-MCP\\ansible_mcp_server.py"]
@@ -204,6 +288,8 @@ pip install -r requirements.txt
   }
 }
 ```
+
+**Note:** Tool names differ between modes. See [MIGRATION.md](MIGRATION.md) for details.
 
 ### 6. Restart Claude Desktop
 
@@ -219,6 +305,9 @@ pip install -r requirements.txt
 Run the MCP servers in Docker containers for easier distribution and isolation.
 
 ### Quick Start with Docker
+
+**Unified Mode (Recommended)** - All servers in one container:
+
 ```bash
 # Clone and navigate to repository
 git clone https://github.com/bjeans/homelab-mcp
@@ -230,7 +319,17 @@ docker build -t homelab-mcp:latest .
 # Run with Docker Compose (recommended)
 docker-compose up -d
 
-# Or run individual server
+# Or run unified server directly
+docker run -d \
+  --name homelab-mcp \
+  --network host \
+  -v $(pwd)/ansible_hosts.yml:/config/ansible_hosts.yml:ro \
+  homelab-mcp:latest
+```
+
+**Legacy Mode** - Individual servers (set `ENABLED_SERVERS`):
+
+```bash
 docker run -d \
   --name homelab-mcp-docker \
   --network host \
@@ -239,15 +338,19 @@ docker run -d \
   homelab-mcp:latest
 ```
 
-### Currently Available in Docker
+### Available Servers
 
-**Phase 1 (Current):**
+**Unified Mode (Default):**
+- ✅ All 5 servers in one process: Docker, Ping, Ollama, Pi-hole, Unifi
+- ✅ Namespaced tools (e.g., `docker_get_containers`)
+- ✅ Single configuration entry
+
+**Legacy Mode (Set `ENABLED_SERVERS`):**
 - ✅ `docker` - Docker/Podman container management
 - ✅ `ping` - Network ping utilities
-
-**Coming Soon:**
-- 🔄 Ollama, Pi-hole, Unifi servers (Phase 2)
-- 🔄 Ansible inventory server (Phase 3)
+- ✅ `ollama` - Ollama AI model management
+- ✅ `pihole` - Pi-hole DNS statistics
+- ✅ `unifi` - Unifi network device monitoring
 
 ### Docker Configuration
 
@@ -265,7 +368,21 @@ See [DOCKER.md](DOCKER.md) for comprehensive Docker deployment guide including:
 
 ### Integration with Claude Desktop
 
-Configure Claude Desktop to use the containerized servers:
+**Unified Mode (Recommended):**
+
+```json
+{
+  "mcpServers": {
+    "homelab-unified": {
+      "command": "docker",
+      "args": ["exec", "-i", "homelab-mcp", "python", "homelab_unified_mcp.py"]
+    }
+  }
+}
+```
+
+**Legacy Mode (Individual Servers):**
+
 ```json
 {
   "mcpServers": {
@@ -343,10 +460,21 @@ Manage Docker and Podman containers across multiple hosts.
 
 **Tools:**
 
+Individual server mode:
 - `get_docker_containers` - Get containers on a specific host
 - `get_all_containers` - Get all containers across all hosts
 - `get_container_stats` - Get CPU and memory stats
 - `check_container` - Check if a specific container is running
+- `find_containers_by_label` - Find containers by label
+- `get_container_labels` - Get all labels for a container
+
+Unified server mode (namespaced):
+- `docker_get_containers` - Get containers on a specific host
+- `docker_get_all_containers` - Get all containers across all hosts
+- `docker_get_container_stats` - Get CPU and memory stats
+- `docker_check_container` - Check if a specific container is running
+- `docker_find_containers_by_label` - Find containers by label
+- `docker_get_container_labels` - Get all labels for a container
 
 **Configuration Options:**
 

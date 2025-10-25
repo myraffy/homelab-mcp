@@ -26,6 +26,7 @@ from mcp.server.models import InitializationOptions
 
 from mcp_config_loader import load_env_file, load_indexed_env_vars, COMMON_ALLOWED_ENV_VARS
 
+# Module-level initialization for standalone mode
 server = Server("docker-info")
 
 # Load .env with security hardening
@@ -37,58 +38,129 @@ DOCKER_ALLOWED_VARS = COMMON_ALLOWED_ENV_VARS | {
     "PODMAN_*",  # Matches PODMAN_HOST, PODMAN_PORT, etc.
 }
 
-load_env_file(ENV_FILE, allowed_vars=DOCKER_ALLOWED_VARS, strict=True)
+# Only load env file at module level (for standalone mode)
+# When used as a class, config loading happens in __init__
+if __name__ == "__main__":
+    load_env_file(ENV_FILE, allowed_vars=DOCKER_ALLOWED_VARS, strict=True)
+    ANSIBLE_INVENTORY_PATH = os.getenv("ANSIBLE_INVENTORY_PATH", "")
+    logger.info(f"Ansible inventory: {ANSIBLE_INVENTORY_PATH}")
 
-# Configuration
-ANSIBLE_INVENTORY_PATH = os.getenv("ANSIBLE_INVENTORY_PATH", "")
 
-logger.info(f"Ansible inventory: {ANSIBLE_INVENTORY_PATH}")
-
-
-def load_container_hosts_from_ansible():
+def load_container_hosts_from_ansible(inventory=None):
     """
     Load container hosts from Ansible inventory
     Returns dict of {hostname: {'endpoint': 'ip:port', 'runtime': 'docker|podman'}}
+
+    Args:
+        inventory: Optional pre-loaded Ansible inventory dict (avoids file locking in unified mode)
     """
-    if not ANSIBLE_INVENTORY_PATH or not Path(ANSIBLE_INVENTORY_PATH).exists():
-        logger.warning(f"Ansible inventory not found at: {ANSIBLE_INVENTORY_PATH}")
-        logger.warning("Falling back to .env configuration")
-        return load_container_hosts_from_env()
+    # Use pre-loaded inventory if provided
+    if inventory is None:
+        # Get path from environment variable
+        ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
 
+        if not ansible_inventory_path or not Path(ansible_inventory_path).exists():
+            logger.warning(f"Ansible inventory not found at: {ansible_inventory_path}")
+            logger.warning("Falling back to .env configuration")
+            return load_container_hosts_from_env()
+
+        try:
+            with open(ansible_inventory_path, "r") as f:
+                inventory = yaml.safe_load(f)
+        except Exception as e:
+            logger.error(f"Error loading Ansible inventory: {e}")
+            logger.warning("Falling back to .env configuration")
+            return load_container_hosts_from_env()
+
+    # Process the inventory (whether pre-loaded or freshly loaded)
     try:
-        with open(ANSIBLE_INVENTORY_PATH, "r") as f:
-            inventory = yaml.safe_load(f)
-
         container_hosts = {}
 
-        all_group = inventory.get("all", {})
-        children = all_group.get("children", {})
+        # Helper function to find a group anywhere in the inventory tree
+        def find_group(data, target_name):
+            """Recursively search for a group by name"""
+            if isinstance(data, dict):
+                if target_name in data:
+                    return data[target_name]
+                for value in data.values():
+                    if isinstance(value, dict):
+                        result = find_group(value, target_name)
+                        if result:
+                            return result
+            return None
 
-        # Process Docker hosts
-        docker_group = children.get("docker_hosts", {})
-        for hostname, host_vars in docker_group.get("hosts", {}).items():
-            display_name = hostname.split(".")[0]
-            ip = host_vars.get("ansible_host", hostname.split(".")[0])
-            port = host_vars.get("docker_api_port", 2375)
+        # Helper function to recursively find all hosts in a group
+        def get_hosts_from_group(group_data, inherited_vars=None):
+            """Recursively extract hosts from a group and its children"""
+            inherited_vars = inherited_vars or {}
+            hosts_found = []
 
-            container_hosts[display_name] = {
-                "endpoint": f"{ip}:{port}",
-                "runtime": "docker",
-            }
-            logger.info(f"Found Docker host: {display_name} -> {ip}:{port}")
+            # Merge current group vars with inherited vars
+            current_vars = {**inherited_vars, **group_data.get("vars", {})}
 
-        # Process Podman hosts
-        podman_group = children.get("podman_hosts", {})
-        for hostname, host_vars in podman_group.get("hosts", {}).items():
-            display_name = hostname.split(".")[0]
-            ip = host_vars.get("ansible_host", hostname.split(".")[0])
-            port = host_vars.get("podman_api_port", 8080)
+            # Get direct hosts in this group
+            if "hosts" in group_data:
+                for hostname, host_vars in group_data["hosts"].items():
+                    merged_vars = {**current_vars, **(host_vars or {})}
+                    hosts_found.append((hostname, merged_vars))
 
-            container_hosts[display_name] = {
-                "endpoint": f"{ip}:{port}",
-                "runtime": "podman",
-            }
-            logger.info(f"Found Podman host: {display_name} -> {ip}:{port}")
+            # Recursively process child groups
+            if "children" in group_data:
+                for child_name, child_data in group_data["children"].items():
+                    # Child groups in Ansible are often just references (empty {})
+                    # We need to find the actual group definition
+                    if not child_data or (not child_data.get("hosts") and not child_data.get("children")):
+                        # This is a reference - find the actual group definition
+                        actual_child_group = find_group(inventory, child_name)
+                        if actual_child_group:
+                            hosts_found.extend(get_hosts_from_group(actual_child_group, current_vars))
+                    else:
+                        # This is an inline definition - process directly
+                        hosts_found.extend(get_hosts_from_group(child_data, current_vars))
+
+            return hosts_found
+
+        # Get Docker group name from env (configurable)
+        docker_group_name = os.getenv("DOCKER_ANSIBLE_GROUP", "Ubuntu_Server")
+        podman_group_name = os.getenv("PODMAN_ANSIBLE_GROUP", "podman_hosts")
+
+        # Find and process Docker hosts
+        docker_group = find_group(inventory, docker_group_name)
+        if docker_group:
+            docker_hosts_list = get_hosts_from_group(docker_group)
+            logger.info(f"Found {len(docker_hosts_list)} hosts in {docker_group_name} group")
+
+            for hostname, host_vars in docker_hosts_list:
+                display_name = hostname.split(".")[0]
+                ip = host_vars.get("ansible_host", host_vars.get("static_ip", hostname.split(".")[0]))
+                port = host_vars.get("docker_api_port", 2375)
+
+                container_hosts[display_name] = {
+                    "endpoint": f"{ip}:{port}",
+                    "runtime": "docker",
+                }
+                logger.info(f"Found Docker host: {display_name} -> {ip}:{port}")
+        else:
+            logger.debug(f"Docker group '{docker_group_name}' not found in inventory")
+
+        # Find and process Podman hosts
+        podman_group = find_group(inventory, podman_group_name)
+        if podman_group:
+            podman_hosts_list = get_hosts_from_group(podman_group)
+            logger.info(f"Found {len(podman_hosts_list)} hosts in {podman_group_name} group")
+
+            for hostname, host_vars in podman_hosts_list:
+                display_name = hostname.split(".")[0]
+                ip = host_vars.get("ansible_host", host_vars.get("static_ip", hostname.split(".")[0]))
+                port = host_vars.get("podman_api_port", 8080)
+
+                container_hosts[display_name] = {
+                    "endpoint": f"{ip}:{port}",
+                    "runtime": "podman",
+                }
+                logger.info(f"Found Podman host: {display_name} -> {ip}:{port}")
+        else:
+            logger.debug(f"Podman group '{podman_group_name}' not found in inventory")
 
         if not container_hosts:
             logger.warning("No container hosts found in Ansible inventory")
@@ -97,7 +169,7 @@ def load_container_hosts_from_ansible():
         return container_hosts
 
     except Exception as e:
-        logger.error(f"Error loading Ansible inventory: {e}")
+        logger.error(f"Error processing Ansible inventory: {e}")
         logger.warning("Falling back to .env configuration")
         return load_container_hosts_from_env()
 
@@ -205,14 +277,16 @@ def load_container_hosts_from_env():
     return container_hosts
 
 
-# Load container hosts on startup
-CONTAINER_HOSTS = load_container_hosts_from_ansible()
-
-if not CONTAINER_HOSTS:
-    logger.error("No container hosts configured!")
-    logger.error(
-        "Please set ANSIBLE_INVENTORY_PATH or DOCKER_/PODMAN_*_ENDPOINT environment variables"
-    )
+# Load container hosts on startup (module-level, but only if in standalone mode)
+# This needs to be at module level for the @server decorators to access it
+CONTAINER_HOSTS = {}
+if __name__ == "__main__":
+    CONTAINER_HOSTS = load_container_hosts_from_ansible()
+    if not CONTAINER_HOSTS:
+        logger.error("No container hosts configured!")
+        logger.error(
+            "Please set ANSIBLE_INVENTORY_PATH or DOCKER_/PODMAN_*_ENDPOINT environment variables"
+        )
 
 
 async def container_api_request(
@@ -357,6 +431,148 @@ def format_labels_output(labels: Dict, indent: str = "  ") -> str:
     return output
 
 
+class DockerMCPServer:
+    """Docker/Podman MCP Server - Class-based implementation"""
+
+    def __init__(self, ansible_inventory=None):
+        """Initialize configuration using existing config loading logic
+
+        Args:
+            ansible_inventory: Optional pre-loaded Ansible inventory dict (for unified mode)
+        """
+        # Load environment configuration (skip if in unified mode)
+        if not os.getenv("MCP_UNIFIED_MODE"):
+            load_env_file(ENV_FILE, allowed_vars=DOCKER_ALLOWED_VARS, strict=True)
+
+        self.ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
+        logger.info(f"[DockerMCPServer] Ansible inventory: {self.ansible_inventory_path}")
+
+        # Load container hosts (use pre-loaded inventory if provided)
+        self.container_hosts = load_container_hosts_from_ansible(ansible_inventory)
+
+        if not self.container_hosts:
+            logger.warning("[DockerMCPServer] No container hosts configured!")
+            logger.warning("Please set ANSIBLE_INVENTORY_PATH or DOCKER_/PODMAN_*_ENDPOINT environment variables")
+
+    async def list_tools(self) -> list[types.Tool]:
+        """Return list of Tool objects this server provides (with docker_ prefix)"""
+        return [
+            types.Tool(
+                name="docker_get_containers",
+                description="Get containers on a specific host (works with both Docker and Podman)",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "hostname": {
+                            "type": "string",
+                            "description": f"Host: {', '.join(self.container_hosts.keys())}",
+                            "enum": list(self.container_hosts.keys()),
+                        }
+                    },
+                    "required": ["hostname"],
+                },
+            ),
+            types.Tool(
+                name="docker_get_all_containers",
+                description="Get all containers across all hosts",
+                inputSchema={"type": "object", "properties": {}},
+            ),
+            types.Tool(
+                name="docker_get_container_stats",
+                description="Get CPU and memory stats for containers on a host",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "hostname": {
+                            "type": "string",
+                            "description": f"Host: {', '.join(self.container_hosts.keys())}",
+                            "enum": list(self.container_hosts.keys()),
+                        }
+                    },
+                    "required": ["hostname"],
+                },
+            ),
+            types.Tool(
+                name="docker_check_container",
+                description="Check if a specific container is running on a host",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "hostname": {
+                            "type": "string",
+                            "description": f"Host: {', '.join(self.container_hosts.keys())}",
+                            "enum": list(self.container_hosts.keys()),
+                        },
+                        "container": {
+                            "type": "string",
+                            "description": "Container name to check",
+                        },
+                    },
+                    "required": ["hostname", "container"],
+                },
+            ),
+            types.Tool(
+                name="docker_find_containers_by_label",
+                description="Find containers by label key-value pair (e.g., find traefik-enabled containers or containers with specific domains)",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "hostname": {
+                            "type": "string",
+                            "description": f"Host to search (or 'all' for all hosts): {', '.join(self.container_hosts.keys())}",
+                        },
+                        "label_key": {
+                            "type": "string",
+                            "description": "Label key to search for (e.g., 'traefik.http.routers.web.rule', 'domain', 'app')",
+                        },
+                        "label_value": {
+                            "type": "string",
+                            "description": "Optional: Label value to match (substring match). If not provided, returns all containers with this key",
+                        },
+                    },
+                    "required": ["label_key"],
+                },
+            ),
+            types.Tool(
+                name="docker_get_container_labels",
+                description="Get all labels for a specific container",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "hostname": {
+                            "type": "string",
+                            "description": f"Host: {', '.join(self.container_hosts.keys())}",
+                            "enum": list(self.container_hosts.keys()),
+                        },
+                        "container": {
+                            "type": "string",
+                            "description": "Container name",
+                        },
+                    },
+                    "required": ["hostname", "container"],
+                },
+            ),
+        ]
+
+    async def handle_tool(self, tool_name: str, arguments: dict | None) -> list[types.TextContent]:
+        """Route tool calls to appropriate handler methods"""
+        # Strip the docker_ prefix for routing to the original tool names
+        name = tool_name.replace("docker_", "", 1) if tool_name.startswith("docker_") else tool_name
+
+        # Map class tool names back to module-level tool names
+        # docker_get_containers -> get_docker_containers
+        if name.startswith("get_"):
+            if not name.startswith("get_docker_") and not name.startswith("get_all_") and not name.startswith("get_container_"):
+                name = f"get_docker_{name[4:]}"  # get_containers -> get_docker_containers
+            elif name == "get_containers":
+                name = "get_docker_containers"
+
+        logger.info(f"[DockerMCPServer] Tool called: {tool_name} -> {name} with args: {arguments}")
+
+        # Call the shared implementation with this instance's container_hosts
+        return await handle_call_tool_impl(name, arguments, self.container_hosts)
+
+
 @server.list_tools()
 async def handle_list_tools() -> list[types.Tool]:
     """List available container management tools"""
@@ -459,19 +675,15 @@ async def handle_list_tools() -> list[types.Tool]:
     ]
 
 
-@server.call_tool()
-async def handle_call_tool(
-    name: str, arguments: dict | None
+async def handle_call_tool_impl(
+    name: str, arguments: dict | None, container_hosts: Dict
 ) -> list[types.TextContent]:
-    """Handle tool execution requests"""
-
-    logger.info(f"Tool called: {name} with args: {arguments}")
-
+    """Core tool execution logic that can be called by both class and module-level handlers"""
     try:
         if name == "get_docker_containers":
             default_hostname = (
-                list(CONTAINER_HOSTS.keys())[0]
-                if CONTAINER_HOSTS
+                list(container_hosts.keys())[0]
+                if container_hosts
                 else "no-hosts-configured"
             )
             hostname = (
@@ -480,15 +692,15 @@ async def handle_call_tool(
                 else default_hostname
             )
 
-            if hostname not in CONTAINER_HOSTS:
+            if hostname not in container_hosts:
                 return [
                     types.TextContent(
                         type="text",
-                        text=f"Error: Unknown host '{hostname}'. Valid hosts: {', '.join(CONTAINER_HOSTS.keys())}",
+                        text=f"Error: Unknown host '{hostname}'. Valid hosts: {', '.join(container_hosts.keys())}",
                     )
                 ]
 
-            runtime = CONTAINER_HOSTS[hostname]["runtime"]
+            runtime = container_hosts[hostname]["runtime"]
             containers = await container_api_request(hostname, "/containers/json")
 
             if containers is None:
@@ -560,7 +772,7 @@ async def handle_call_tool(
             total_containers = 0
             results = []
 
-            for hostname, config in CONTAINER_HOSTS.items():
+            for hostname, config in container_hosts.items():
                 runtime = config["runtime"]
                 containers = await container_api_request(hostname, "/containers/json")
 
@@ -594,8 +806,8 @@ async def handle_call_tool(
 
         elif name == "get_container_stats":
             default_hostname = (
-                list(CONTAINER_HOSTS.keys())[0]
-                if CONTAINER_HOSTS
+                list(container_hosts.keys())[0]
+                if container_hosts
                 else "no-hosts-configured"
             )
             hostname = (
@@ -604,14 +816,14 @@ async def handle_call_tool(
                 else default_hostname
             )
 
-            if hostname not in CONTAINER_HOSTS:
+            if hostname not in container_hosts:
                 return [
                     types.TextContent(
                         type="text", text=f"Error: Unknown host '{hostname}'"
                     )
                 ]
 
-            runtime = CONTAINER_HOSTS[hostname]["runtime"]
+            runtime = container_hosts[hostname]["runtime"]
             containers = await container_api_request(hostname, "/containers/json")
 
             if containers is None:
@@ -699,7 +911,7 @@ async def handle_call_tool(
                     )
                 ]
 
-            runtime = CONTAINER_HOSTS.get(hostname, {}).get("runtime", "docker")
+            runtime = container_hosts.get(hostname, {}).get("runtime", "docker")
             containers = await container_api_request(hostname, "/containers/json")
 
             if containers is None:
@@ -752,7 +964,7 @@ async def handle_call_tool(
 
             # Determine which hosts to search
             hosts_to_search = (
-                CONTAINER_HOSTS.keys()
+                container_hosts.keys()
                 if hostname_arg.lower() == "all"
                 else [hostname_arg]
             )
@@ -765,11 +977,11 @@ async def handle_call_tool(
             results_found = False
 
             for hostname in hosts_to_search:
-                if hostname not in CONTAINER_HOSTS:
+                if hostname not in container_hosts:
                     output += f"✗ Unknown host: {hostname}\n"
                     continue
 
-                runtime = CONTAINER_HOSTS[hostname]["runtime"]
+                runtime = container_hosts[hostname]["runtime"]
                 containers = await container_api_request(hostname, "/containers/json")
 
                 if containers is None:
@@ -820,7 +1032,7 @@ async def handle_call_tool(
                     )
                 ]
 
-            if hostname not in CONTAINER_HOSTS:
+            if hostname not in container_hosts:
                 return [
                     types.TextContent(
                         type="text",
@@ -828,7 +1040,7 @@ async def handle_call_tool(
                     )
                 ]
 
-            runtime = CONTAINER_HOSTS[hostname]["runtime"]
+            runtime = container_hosts[hostname]["runtime"]
             containers = await container_api_request(hostname, "/containers/json")
 
             if containers is None:
@@ -893,6 +1105,20 @@ async def handle_call_tool(
         return [
             types.TextContent(type="text", text=f"Error executing {name}: {str(e)}")
         ]
+
+
+@server.call_tool()
+async def handle_call_tool(
+    name: str, arguments: dict | None
+) -> list[types.TextContent]:
+    """Handle tool execution requests (module-level wrapper for standalone mode)"""
+    logger.info(f"Tool called: {name} with args: {arguments}")
+
+    # For standalone mode, use the global CONTAINER_HOSTS
+    if 'CONTAINER_HOSTS' not in globals():
+        return [types.TextContent(type="text", text="Error: CONTAINER_HOSTS not initialized")]
+
+    return await handle_call_tool_impl(name, arguments, CONTAINER_HOSTS)
 
 
 async def main():

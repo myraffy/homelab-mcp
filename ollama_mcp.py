@@ -39,7 +39,9 @@ OLLAMA_ALLOWED_VARS = COMMON_ALLOWED_ENV_VARS | {
     "LITELLM_*",  # Pattern: covers LITELLM_HOST, LITELLM_PORT, etc.
 }
 
-load_env_file(ENV_FILE, allowed_vars=OLLAMA_ALLOWED_VARS, strict=True)
+# Only load env file at module level if not in unified mode
+if not os.getenv("MCP_UNIFIED_MODE"):
+    load_env_file(ENV_FILE, allowed_vars=OLLAMA_ALLOWED_VARS, strict=True)
 
 # Configuration
 ANSIBLE_INVENTORY_PATH = os.getenv("ANSIBLE_INVENTORY_PATH", "")
@@ -54,51 +56,102 @@ logger.info(f"Ansible inventory: {ANSIBLE_INVENTORY_PATH}")
 logger.info(f"LiteLLM endpoint: {LITELLM_HOST}:{LITELLM_PORT}")
 
 
-def load_ollama_endpoints_from_ansible():
+def load_ollama_endpoints_from_ansible(inventory=None):
     """
     Load Ollama endpoints from Ansible inventory
     Returns dict of {display_name: ip_address}
+
+    Args:
+        inventory: Optional pre-loaded Ansible inventory dict (avoids file locking in unified mode)
     """
-    if not ANSIBLE_INVENTORY_PATH or not Path(ANSIBLE_INVENTORY_PATH).exists():
-        logger.warning(f"Ansible inventory not found at: {ANSIBLE_INVENTORY_PATH}")
-        logger.warning("Falling back to .env configuration")
-        return load_ollama_endpoints_from_env()
+    # Use pre-loaded inventory if provided
+    if inventory is None:
+        # Get path from environment variable
+        ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
 
+        if not ansible_inventory_path or not Path(ansible_inventory_path).exists():
+            logger.warning(f"Ansible inventory not found at: {ansible_inventory_path}")
+            logger.warning("Falling back to .env configuration")
+            return load_ollama_endpoints_from_env()
+
+        try:
+            with open(ansible_inventory_path, "r") as f:
+                inventory = yaml.safe_load(f)
+        except Exception as e:
+            logger.error(f"Error loading Ansible inventory: {e}")
+            logger.warning("Falling back to .env configuration")
+            return load_ollama_endpoints_from_env()
+
+    # Process the inventory (whether pre-loaded or freshly loaded)
     try:
-        with open(ANSIBLE_INVENTORY_PATH, "r") as f:
-            inventory = yaml.safe_load(f)
-
         endpoints = {}
 
-        # Navigate through the inventory structure to find Ollama servers group
-        all_group = inventory.get("all", {})
-        children = all_group.get("children", {})
+        # Helper function to find a group anywhere in the inventory tree
+        def find_group(data, target_name):
+            """Recursively search for a group by name"""
+            if isinstance(data, dict):
+                if target_name in data:
+                    return data[target_name]
+                for value in data.values():
+                    if isinstance(value, dict):
+                        result = find_group(value, target_name)
+                        if result:
+                            return result
+            return None
 
-        # Find Ollama servers group (configurable via OLLAMA_INVENTORY_GROUP)
-        ollama_group = children.get(OLLAMA_INVENTORY_GROUP, {})
-        ollama_children = ollama_group.get("children", {})
+        # Helper function to recursively find all hosts in a group
+        def get_hosts_from_group(group_data, inherited_vars=None):
+            """Recursively extract hosts from a group and its children"""
+            inherited_vars = inherited_vars or {}
+            hosts_found = []
 
-        # Process each OS-specific group
-        for os_group_name, os_group_data in ollama_children.items():
-            # Get hosts directly or from children
-            hosts = os_group_data.get("hosts", {})
+            # Merge current group vars with inherited vars
+            current_vars = {**inherited_vars, **group_data.get("vars", {})}
 
-            # Also check for nested children (like ollama_ubuntu_servers)
-            for child_name, child_data in os_group_data.get("children", {}).items():
-                hosts.update(child_data.get("hosts", {}))
+            # Get direct hosts in this group
+            if "hosts" in group_data:
+                for hostname, host_vars in group_data["hosts"].items():
+                    merged_vars = {**current_vars, **(host_vars or {})}
+                    hosts_found.append((hostname, merged_vars))
 
-            # Extract hostname and IP
-            for hostname, host_vars in hosts.items():
+            # Recursively process child groups
+            if "children" in group_data:
+                for child_name, child_data in group_data["children"].items():
+                    # Child groups in Ansible are often just references (empty {})
+                    # We need to find the actual group definition
+                    if not child_data or (not child_data.get("hosts") and not child_data.get("children")):
+                        # This is a reference - find the actual group definition
+                        actual_child_group = find_group(inventory, child_name)
+                        if actual_child_group:
+                            hosts_found.extend(get_hosts_from_group(actual_child_group, current_vars))
+                    else:
+                        # This is an inline definition - process directly
+                        hosts_found.extend(get_hosts_from_group(child_data, current_vars))
+
+            return hosts_found
+
+        # Get Ollama group name from env (configurable)
+        ollama_group_name = os.getenv("OLLAMA_ANSIBLE_GROUP", "ollama_servers")
+
+        # Find and process Ollama hosts
+        ollama_group = find_group(inventory, ollama_group_name)
+        if ollama_group:
+            ollama_hosts_list = get_hosts_from_group(ollama_group)
+            logger.info(f"Found {len(ollama_hosts_list)} hosts in {ollama_group_name} group")
+
+            for hostname, host_vars in ollama_hosts_list:
                 # Clean up hostname for display (remove domain suffix)
                 display_name = hostname.split(".")[0]
                 # Capitalize and clean up for display
                 display_name = display_name.replace("-", " ").title().replace(" ", "-")
 
                 # Try to get IP from ansible_host var, or resolve hostname
-                ip = host_vars.get("ansible_host", hostname.split(".")[0])
+                ip = host_vars.get("ansible_host", host_vars.get("static_ip", hostname.split(".")[0]))
 
                 endpoints[display_name] = ip
                 logger.info(f"Found Ollama host: {display_name} -> {ip}")
+        else:
+            logger.debug(f"Ollama group '{ollama_group_name}' not found in inventory")
 
         if not endpoints:
             logger.warning("No Ollama hosts found in Ansible inventory")
@@ -107,7 +160,7 @@ def load_ollama_endpoints_from_ansible():
         return endpoints
 
     except Exception as e:
-        logger.error(f"Error loading Ansible inventory: {e}")
+        logger.error(f"Error processing Ansible inventory: {e}")
         logger.warning("Falling back to .env configuration")
         return load_ollama_endpoints_from_env()
 
@@ -141,17 +194,95 @@ def load_ollama_endpoints_from_env():
     return endpoints
 
 
-# Load Ollama endpoints on startup
-OLLAMA_ENDPOINTS = load_ollama_endpoints_from_ansible()
+# Load Ollama endpoints on startup (module-level for standalone mode)
+OLLAMA_ENDPOINTS = {}
+LITELLM_CONFIG = {}
 
-if not OLLAMA_ENDPOINTS:
-    logger.error("No Ollama endpoints configured!")
-    logger.error("Please set ANSIBLE_INVENTORY_PATH or OLLAMA_* environment variables")
+if __name__ == "__main__":
+    OLLAMA_ENDPOINTS = load_ollama_endpoints_from_ansible()
+    LITELLM_CONFIG = {"host": LITELLM_HOST, "port": LITELLM_PORT}
+
+    if not OLLAMA_ENDPOINTS:
+        logger.error("No Ollama endpoints configured!")
+        logger.error("Please set ANSIBLE_INVENTORY_PATH or OLLAMA_* environment variables")
 
 
-async def ollama_request(host_ip: str, endpoint: str, timeout: int = 5):
+class OllamaMCPServer:
+    """Ollama MCP Server - Class-based implementation"""
+
+    def __init__(self, ansible_inventory=None):
+        """Initialize configuration using existing config loading logic
+
+        Args:
+            ansible_inventory: Optional pre-loaded Ansible inventory dict (for unified mode)
+        """
+        # Load environment configuration (skip if in unified mode)
+        if not os.getenv("MCP_UNIFIED_MODE"):
+            load_env_file(ENV_FILE, allowed_vars=OLLAMA_ALLOWED_VARS, strict=True)
+
+        self.ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
+        self.ollama_port = int(os.getenv("OLLAMA_PORT", "11434"))
+        self.ollama_inventory_group = os.getenv("OLLAMA_INVENTORY_GROUP", "ollama_servers")
+
+        # LiteLLM configuration
+        self.litellm_host = os.getenv("LITELLM_HOST", "localhost")
+        self.litellm_port = os.getenv("LITELLM_PORT", "4000")
+
+        logger.info(f"[OllamaMCPServer] Ansible inventory: {self.ansible_inventory_path}")
+        logger.info(f"[OllamaMCPServer] LiteLLM endpoint: {self.litellm_host}:{self.litellm_port}")
+
+        # Load Ollama endpoints (use pre-loaded inventory if provided)
+        self.ollama_endpoints = load_ollama_endpoints_from_ansible(ansible_inventory)
+
+        if not self.ollama_endpoints:
+            logger.warning("[OllamaMCPServer] No Ollama endpoints configured!")
+
+    async def list_tools(self) -> list[types.Tool]:
+        """Return list of Tool objects this server provides (with ollama_ prefix)"""
+        return [
+            types.Tool(
+                name="ollama_get_status",
+                description="Check status of all Ollama instances",
+                inputSchema={"type": "object", "properties": {}},
+            ),
+            types.Tool(
+                name="ollama_get_models",
+                description="Get models on a specific Ollama host",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "host": {
+                            "type": "string",
+                            "description": f"Host: {', '.join(self.ollama_endpoints.keys())}",
+                        }
+                    },
+                    "required": ["host"],
+                },
+            ),
+            types.Tool(
+                name="ollama_get_litellm_status",
+                description="Check LiteLLM proxy status",
+                inputSchema={"type": "object", "properties": {}},
+            ),
+        ]
+
+    async def handle_tool(self, tool_name: str, arguments: dict | None) -> list[types.TextContent]:
+        """Route tool calls to appropriate handler methods"""
+        # Strip the ollama_ prefix for routing
+        name = tool_name.replace("ollama_", "", 1) if tool_name.startswith("ollama_") else tool_name
+
+        logger.info(f"[OllamaMCPServer] Tool called: {tool_name} -> {name} with args: {arguments}")
+
+        # Call the shared implementation
+        return await handle_call_tool_impl(
+            name, arguments, self.ollama_endpoints, self.ollama_port,
+            self.litellm_host, self.litellm_port
+        )
+
+
+async def ollama_request(host_ip: str, endpoint: str, port: int = 11434, timeout: int = 5):
     """Make request to Ollama API"""
-    url = f"http://{host_ip}:{OLLAMA_PORT}{endpoint}"
+    url = f"http://{host_ip}:{port}{endpoint}"
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -196,19 +327,19 @@ async def handle_list_tools() -> list[types.Tool]:
     ]
 
 
-@server.call_tool()
-async def handle_call_tool(
-    name: str, arguments: dict | None
+async def handle_call_tool_impl(
+    name: str, arguments: dict | None, ollama_endpoints: dict, ollama_port: int,
+    litellm_host: str, litellm_port: str
 ) -> list[types.TextContent]:
-    """Handle tool calls"""
+    """Core tool execution logic that can be called by both class and module-level handlers"""
     try:
-        if name == "get_ollama_status":
+        if name == "get_status" or name == "get_ollama_status":
             output = "=== OLLAMA STATUS ===\n\n"
             total_models = 0
             online = 0
 
-            for host_name, ip in OLLAMA_ENDPOINTS.items():
-                data = await ollama_request(ip, "/api/tags", timeout=3)
+            for host_name, ip in ollama_endpoints.items():
+                data = await ollama_request(ip, "/api/tags", ollama_port, timeout=3)
 
                 if data:
                     models = data.get("models", [])
@@ -228,18 +359,18 @@ async def handle_call_tool(
                     output += f"✗ {host_name} ({ip}): OFFLINE\n\n"
 
             output = (
-                f"Summary: {online}/{len(OLLAMA_ENDPOINTS)} online, {total_models} models\n\n"
+                f"Summary: {online}/{len(ollama_endpoints)} online, {total_models} models\n\n"
                 + output
             )
             return [types.TextContent(type="text", text=output)]
 
-        elif name == "get_ollama_models":
+        elif name == "get_models" or name == "get_ollama_models":
             host = arguments.get("host")
-            if host not in OLLAMA_ENDPOINTS:
+            if host not in ollama_endpoints:
                 return [types.TextContent(type="text", text=f"Invalid host: {host}")]
 
-            ip = OLLAMA_ENDPOINTS[host]
-            data = await ollama_request(ip, "/api/tags", timeout=5)
+            ip = ollama_endpoints[host]
+            data = await ollama_request(ip, "/api/tags", ollama_port, timeout=5)
 
             if not data:
                 return [types.TextContent(type="text", text=f"{host} is offline")]
@@ -259,7 +390,7 @@ async def handle_call_tool(
             return [types.TextContent(type="text", text=output)]
 
         elif name == "get_litellm_status":
-            url = f"http://{LITELLM_HOST}:{LITELLM_PORT}/health/liveliness"
+            url = f"http://{litellm_host}:{litellm_port}/health/liveliness"
             logger.info(f"Checking LiteLLM at {url}")
 
             try:
@@ -273,7 +404,7 @@ async def handle_call_tool(
                                 await response.text()
                             )  # Liveliness returns text, not JSON
                             output = f"✓ LiteLLM Proxy: ONLINE\n"
-                            output += f"Endpoint: {LITELLM_HOST}:{LITELLM_PORT}\n\n"
+                            output += f"Endpoint: {litellm_host}:{litellm_port}\n\n"
                             output += f"Liveliness Check: {data}"
                             return [types.TextContent(type="text", text=output)]
                         else:
@@ -308,6 +439,17 @@ async def handle_call_tool(
 
     except Exception as e:
         return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+@server.call_tool()
+async def handle_call_tool(
+    name: str, arguments: dict | None
+) -> list[types.TextContent]:
+    """Handle tool calls (module-level wrapper for standalone mode)"""
+    # For standalone mode, use the global variables
+    return await handle_call_tool_impl(
+        name, arguments, OLLAMA_ENDPOINTS, OLLAMA_PORT, LITELLM_HOST, LITELLM_PORT
+    )
 
 
 async def main():

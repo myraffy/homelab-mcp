@@ -44,7 +44,9 @@ PING_ALLOWED_VARS = COMMON_ALLOWED_ENV_VARS | {
     "PING_*",  # Pattern for ping-specific variables if needed
 }
 
-load_env_file(ENV_FILE, allowed_vars=PING_ALLOWED_VARS, strict=True)
+# Only load env file at module level if not in unified mode
+if not os.getenv("MCP_UNIFIED_MODE"):
+    load_env_file(ENV_FILE, allowed_vars=PING_ALLOWED_VARS, strict=True)
 
 # Configuration
 ANSIBLE_INVENTORY_PATH = os.getenv("ANSIBLE_INVENTORY_PATH", "")
@@ -107,7 +109,7 @@ def load_ping_targets_from_env():
     }
 
 
-def load_ansible_inventory():
+def load_ansible_inventory(inventory=None):
     """
     Load and cache the Ansible inventory with full variable inheritance.
     Falls back to environment variables if Ansible inventory not found.
@@ -117,25 +119,45 @@ def load_ansible_inventory():
     1. Group vars (from parent to child)
     2. Host vars (override group vars)
     3. Environment variables (fallback)
+
+    Args:
+        inventory: Optional pre-loaded Ansible inventory dict (avoids file locking in unified mode)
     """
     global INVENTORY_DATA
 
+    # Use cached data if available (for standalone mode)
     if INVENTORY_DATA is not None:
         return INVENTORY_DATA
 
-    if not ANSIBLE_INVENTORY_PATH or not Path(ANSIBLE_INVENTORY_PATH).exists():
-        logger.warning(f"Ansible inventory not found at: {ANSIBLE_INVENTORY_PATH}")
-        logger.info("Attempting to load ping targets from environment variables")
-        INVENTORY_DATA = load_ping_targets_from_env()
-        if INVENTORY_DATA and INVENTORY_DATA.get("hosts"):
-            logger.info(f"Loaded {len(INVENTORY_DATA['hosts'])} ping targets from environment")
-            return INVENTORY_DATA
-        logger.error("No ping targets configured in Ansible inventory or environment variables")
-        return {"hosts": {}, "groups": {}}
+    # Use pre-loaded inventory if provided
+    if inventory is None:
+        # Get path from environment variable
+        ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
 
+        if not ansible_inventory_path or not Path(ansible_inventory_path).exists():
+            logger.warning(f"Ansible inventory not found at: {ansible_inventory_path}")
+            logger.info("Attempting to load ping targets from environment variables")
+            INVENTORY_DATA = load_ping_targets_from_env()
+            if INVENTORY_DATA and INVENTORY_DATA.get("hosts"):
+                logger.info(f"Loaded {len(INVENTORY_DATA['hosts'])} ping targets from environment")
+                return INVENTORY_DATA
+            logger.error("No ping targets configured in Ansible inventory or environment variables")
+            return {"hosts": {}, "groups": {}}
+
+        try:
+            with open(ansible_inventory_path, "r") as f:
+                inventory = yaml.safe_load(f)
+        except Exception as e:
+            logger.error(f"Error loading Ansible inventory: {e}", exc_info=True)
+            logger.info("Attempting to load ping targets from environment variables as fallback")
+            INVENTORY_DATA = load_ping_targets_from_env()
+            if INVENTORY_DATA and INVENTORY_DATA.get("hosts"):
+                logger.info(f"Loaded {len(INVENTORY_DATA['hosts'])} ping targets from environment variables")
+                return INVENTORY_DATA
+            return {"hosts": {}, "groups": {}}
+
+    # Process the inventory (whether pre-loaded or freshly loaded)
     try:
-        with open(ANSIBLE_INVENTORY_PATH, "r") as f:
-            inventory = yaml.safe_load(f)
 
         hosts = {}
         groups = {}
@@ -228,7 +250,7 @@ def load_ansible_inventory():
         return INVENTORY_DATA
 
     except Exception as e:
-        logger.error(f"Error loading Ansible inventory: {e}", exc_info=True)
+        logger.error(f"Error processing Ansible inventory: {e}", exc_info=True)
         logger.info("Attempting to load ping targets from environment variables as fallback")
         INVENTORY_DATA = load_ping_targets_from_env()
         if INVENTORY_DATA and INVENTORY_DATA.get("hosts"):
@@ -382,6 +404,138 @@ def format_ping_result(result: Dict) -> str:
     return "\n".join(output)
 
 
+class PingMCPServer:
+    """Ping MCP Server - Class-based implementation"""
+
+    def __init__(self, ansible_inventory=None):
+        """Initialize configuration using existing config loading logic
+
+        Args:
+            ansible_inventory: Optional pre-loaded Ansible inventory dict (for unified mode)
+        """
+        # Load environment configuration (skip if in unified mode)
+        if not os.getenv("MCP_UNIFIED_MODE"):
+            load_env_file(ENV_FILE, allowed_vars=PING_ALLOWED_VARS, strict=True)
+
+        self.ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
+        logger.info(f"[PingMCPServer] Ansible inventory: {self.ansible_inventory_path}")
+
+        # Load inventory (with caching)
+        self.inventory_data = None
+        self.ansible_inventory = ansible_inventory  # Store pre-loaded inventory
+        self._load_inventory()
+
+    def _load_inventory(self):
+        """Load Ansible inventory (internal method)"""
+        # Use pre-loaded inventory if available, otherwise load it
+        self.inventory_data = load_ansible_inventory(self.ansible_inventory)
+        logger.info(f"[PingMCPServer] Loaded {len(self.inventory_data['hosts'])} hosts")
+
+    async def list_tools(self) -> list[types.Tool]:
+        """Return list of Tool objects this server provides (with ping_ prefix)"""
+        return [
+            types.Tool(
+                name="ping_ping_host",
+                description="Ping a specific host by hostname from Ansible inventory",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "hostname": {
+                            "type": "string",
+                            "description": "Hostname from Ansible inventory (e.g., 'server1.example.com', 'server2.example.com')",
+                        },
+                        "count": {
+                            "type": "integer",
+                            "description": "Number of ping packets to send (default: 4)",
+                            "default": 4,
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Timeout in seconds per ping (default: 5)",
+                            "default": 5,
+                        },
+                    },
+                    "required": ["hostname"],
+                },
+            ),
+            types.Tool(
+                name="ping_ping_group",
+                description="Ping all hosts in an Ansible group",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "group": {
+                            "type": "string",
+                            "description": "Ansible group name (e.g., 'webservers', 'databases', 'docker_hosts')",
+                        },
+                        "count": {
+                            "type": "integer",
+                            "description": "Number of ping packets to send (default: 2)",
+                            "default": 2,
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Timeout in seconds per ping (default: 3)",
+                            "default": 3,
+                        },
+                    },
+                    "required": ["group"],
+                },
+            ),
+            types.Tool(
+                name="ping_ping_all",
+                description="Ping all hosts in the infrastructure",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "count": {
+                            "type": "integer",
+                            "description": "Number of ping packets to send (default: 2)",
+                            "default": 2,
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Timeout in seconds per ping (default: 3)",
+                            "default": 3,
+                        },
+                    },
+                    "required": [],
+                },
+            ),
+            types.Tool(
+                name="ping_list_groups",
+                description="List all available Ansible groups for pinging",
+                inputSchema={"type": "object", "properties": {}, "required": []},
+            ),
+            types.Tool(
+                name="ping_list_hosts",
+                description="List all hosts in the Ansible inventory with their resolved IPs",
+                inputSchema={"type": "object", "properties": {}, "required": []},
+            ),
+            types.Tool(
+                name="ping_reload_inventory",
+                description="Reload Ansible inventory from disk (useful after inventory changes)",
+                inputSchema={"type": "object", "properties": {}, "required": []},
+            ),
+        ]
+
+    async def handle_tool(self, tool_name: str, arguments: dict | None) -> list[types.TextContent]:
+        """Route tool calls to appropriate handler methods"""
+        # Strip the ping_ prefix for routing
+        name = tool_name.replace("ping_", "", 1) if tool_name.startswith("ping_") else tool_name
+
+        logger.info(f"[PingMCPServer] Tool called: {tool_name} -> {name} with args: {arguments}")
+
+        # Call the shared implementation with this instance's inventory
+        return await handle_call_tool_impl(name, arguments, self.inventory_data, self._reload_inventory_impl)
+
+    async def _reload_inventory_impl(self):
+        """Reload inventory for this instance"""
+        self.inventory_data = None
+        self._load_inventory()
+        return self.inventory_data
+
+
 @server.list_tools()
 async def handle_list_tools() -> list[types.Tool]:
     """List available ping tools"""
@@ -472,13 +626,11 @@ async def handle_list_tools() -> list[types.Tool]:
     ]
 
 
-@server.call_tool()
-async def handle_call_tool(
-    name: str, arguments: dict | None
+async def handle_call_tool_impl(
+    name: str, arguments: dict | None, inventory: dict, reload_inventory_func=None
 ) -> list[types.TextContent]:
-    """Handle tool calls"""
+    """Core tool execution logic that can be called by both class and module-level handlers"""
     try:
-        inventory = load_ansible_inventory()
 
         if name == "list_groups":
             output = "=== AVAILABLE ANSIBLE GROUPS ===\n\n"
@@ -513,9 +665,13 @@ async def handle_call_tool(
             return [types.TextContent(type="text", text=output)]
 
         elif name == "reload_inventory":
-            global INVENTORY_DATA
-            INVENTORY_DATA = None
-            inventory = load_ansible_inventory()
+            # Use provided reload function or reload global inventory
+            if reload_inventory_func:
+                inventory = await reload_inventory_func()
+            else:
+                global INVENTORY_DATA
+                INVENTORY_DATA = None
+                inventory = load_ansible_inventory()
 
             output = "=== INVENTORY RELOADED ===\n\n"
             output += f"✓ Loaded {len(inventory['hosts'])} hosts\n"
@@ -642,6 +798,16 @@ async def handle_call_tool(
     except Exception as e:
         logger.error(f"Error in tool {name}: {str(e)}", exc_info=True)
         return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+@server.call_tool()
+async def handle_call_tool(
+    name: str, arguments: dict | None
+) -> list[types.TextContent]:
+    """Handle tool calls (module-level wrapper for standalone mode)"""
+    # For standalone mode, load inventory fresh each time or use cached
+    inventory = load_ansible_inventory()
+    return await handle_call_tool_impl(name, arguments, inventory)
 
 
 async def main():

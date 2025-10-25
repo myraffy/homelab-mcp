@@ -1,44 +1,73 @@
 services:
-  # Docker MCP Server
-  homelab-mcp-docker:
+  # Unified Homelab MCP Server (RECOMMENDED - All services in one)
+  homelab-mcp:
     build: .
-    container_name: homelab-mcp-docker
+    container_name: homelab-mcp
     environment:
-      - ENABLED_SERVERS=docker
-      # Option 1: Use Ansible Inventory (recommended)
+      # Leave ENABLED_SERVERS unset to use unified mode (default)
+      # Set ANSIBLE_INVENTORY_PATH to your Ansible inventory file
       - ANSIBLE_INVENTORY_PATH=/config/ansible_hosts.yml
-      # Option 2: Use Environment Variables (uncomment if not using Ansible)
-      # - DOCKER_SERVER1_ENDPOINT=192.168.1.100:2375
-      # - DOCKER_SERVER2_ENDPOINT=192.168.1.101:2375
-      # - PODMAN_SERVER1_ENDPOINT=192.168.1.102:8080
-    volumes:
-      # Mount your Ansible inventory (if using)
-      - ./ansible_hosts.yml:/config/ansible_hosts.yml:ro
-    network_mode: host  # Required to access homelab Docker APIs
-    restart: unless-stopped
-    stdin_open: true   # Required for MCP stdio communication
-    tty: true          # Required for MCP stdio communication
 
-  # Ping MCP Server
-  homelab-mcp-ping:
-    build: .
-    container_name: homelab-mcp-ping
-    environment:
-      - ENABLED_SERVERS=ping
-      # Option 1: Use Ansible Inventory (recommended)
-      - ANSIBLE_INVENTORY_PATH=/config/ansible_hosts.yml
-      # Option 2: Use Environment Variables (uncomment if not using Ansible)
+      # Add any service-specific environment variables here
+      # Docker/Podman (optional - can use Ansible inventory instead)
+      # - DOCKER_SERVER1_ENDPOINT=192.168.1.100:2375
+      # - PODMAN_SERVER1_ENDPOINT=192.168.1.102:8080
+
+      # Ping targets (optional - can use Ansible inventory instead)
       # - PING_TARGET1=192.168.1.1
-      # - PING_TARGET2=192.168.1.100
+      # - PING_TARGET1_NAME=Gateway
+
+      # Ollama (optional - can use Ansible inventory instead)
+      # - OLLAMA_PORT=11434
+      # - OLLAMA_SERVER1=192.168.1.105
+
+      # Pi-hole
+      # - PIHOLE_DELL_HOST=192.168.1.110
+      # - PIHOLE_DELL_PORT=80
+      # - PIHOLE_API_KEY_DELL=your-api-key-here
+
+      # Unifi
+      # - UNIFI_HOST=192.168.1.1
+      # - UNIFI_API_KEY=your-api-key-here
+
     volumes:
-      # Mount your Ansible inventory (if using)
+      # Mount your Ansible inventory (recommended)
       - ./ansible_hosts.yml:/config/ansible_hosts.yml:ro
-    network_mode: host  # Required for ICMP ping
+    network_mode: host  # Required to access homelab services
     restart: unless-stopped
     stdin_open: true   # Required for MCP stdio communication
     tty: true          # Required for MCP stdio communication
     cap_add:
       - NET_RAW        # Required for ICMP ping operations
 
-# Note: MCP servers communicate over stdio, not network ports
-# Each service runs independently and connects to Claude Desktop via stdio
+  # Legacy mode: Individual servers (uncomment if needed)
+  # homelab-mcp-docker:
+  #   build: .
+  #   container_name: homelab-mcp-docker
+  #   environment:
+  #     - ENABLED_SERVERS=docker
+  #     - ANSIBLE_INVENTORY_PATH=/config/ansible_hosts.yml
+  #   volumes:
+  #     - ./ansible_hosts.yml:/config/ansible_hosts.yml:ro
+  #   network_mode: host
+  #   restart: unless-stopped
+  #   stdin_open: true
+  #   tty: true
+
+  # homelab-mcp-ping:
+  #   build: .
+  #   container_name: homelab-mcp-ping
+  #   environment:
+  #     - ENABLED_SERVERS=ping
+  #     - ANSIBLE_INVENTORY_PATH=/config/ansible_hosts.yml
+  #   volumes:
+  #     - ./ansible_hosts.yml:/config/ansible_hosts.yml:ro
+  #   network_mode: host
+  #   restart: unless-stopped
+  #   stdin_open: true
+  #   tty: true
+  #   cap_add:
+  #     - NET_RAW
+
+# Note: The unified server exposes all tools from all sub-servers with namespaced names
+# (docker_*, ping_*, ollama_*, pihole_*, unifi_*)

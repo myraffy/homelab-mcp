@@ -38,7 +38,9 @@ PIHOLE_ALLOWED_VARS = COMMON_ALLOWED_ENV_VARS | {
     "PIHOLE_*",  # Matches PIHOLE_HOST, PIHOLE_PASSWORD, etc.
 }
 
-load_env_file(ENV_FILE, allowed_vars=PIHOLE_ALLOWED_VARS, strict=True)
+# Only load env file at module level if not in unified mode
+if not os.getenv("MCP_UNIFIED_MODE"):
+    load_env_file(ENV_FILE, allowed_vars=PIHOLE_ALLOWED_VARS, strict=True)
 
 # Configuration
 ANSIBLE_INVENTORY_PATH = os.getenv("ANSIBLE_INVENTORY_PATH", "")
@@ -49,35 +51,94 @@ logger.info(f"Ansible inventory: {ANSIBLE_INVENTORY_PATH}")
 SESSION_CACHE = {}
 
 
-def load_pihole_hosts_from_ansible():
+def load_pihole_hosts_from_ansible(inventory=None):
     """
     Load Pi-hole hosts from Ansible inventory
     Returns list of tuples: [(display_name, host, port, api_key), ...]
+
+    Args:
+        inventory: Optional pre-loaded Ansible inventory dict (avoids file locking in unified mode)
     """
-    if not ANSIBLE_INVENTORY_PATH or not Path(ANSIBLE_INVENTORY_PATH).exists():
-        logger.warning(f"Ansible inventory not found at: {ANSIBLE_INVENTORY_PATH}")
-        logger.warning("Falling back to .env configuration")
-        return load_pihole_hosts_from_env()
+    # Use pre-loaded inventory if provided
+    if inventory is None:
+        # Get path from environment variable
+        ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
 
+        if not ansible_inventory_path or not Path(ansible_inventory_path).exists():
+            logger.warning(f"Ansible inventory not found at: {ansible_inventory_path}")
+            logger.warning("Falling back to .env configuration")
+            return load_pihole_hosts_from_env()
+
+        try:
+            with open(ansible_inventory_path, "r") as f:
+                inventory = yaml.safe_load(f)
+        except Exception as e:
+            logger.error(f"Error loading Ansible inventory: {e}")
+            logger.warning("Falling back to .env configuration")
+            return load_pihole_hosts_from_env()
+
+    # Process the inventory (whether pre-loaded or freshly loaded)
     try:
-        with open(ANSIBLE_INVENTORY_PATH, "r") as f:
-            inventory = yaml.safe_load(f)
-
         pihole_hosts = []
 
-        all_group = inventory.get("all", {})
-        children = all_group.get("children", {})
+        # Helper function to find a group anywhere in the inventory tree
+        def find_group(data, target_name):
+            """Recursively search for a group by name"""
+            if isinstance(data, dict):
+                if target_name in data:
+                    return data[target_name]
+                for value in data.values():
+                    if isinstance(value, dict):
+                        result = find_group(value, target_name)
+                        if result:
+                            return result
+            return None
 
-        # Find pihole_servers group
-        pihole_group = children.get("pihole_servers", {})
+        # Helper function to recursively find all hosts in a group
+        def get_hosts_from_group(group_data, inherited_vars=None):
+            """Recursively extract hosts from a group and its children"""
+            inherited_vars = inherited_vars or {}
+            hosts_found = []
 
-        # Process all children groups (pihole_docker, pihole_native, etc.)
-        for group_name, group_data in pihole_group.get("children", {}).items():
-            for hostname, host_vars in group_data.get("hosts", {}).items():
+            # Merge current group vars with inherited vars
+            current_vars = {**inherited_vars, **group_data.get("vars", {})}
+
+            # Get direct hosts in this group
+            if "hosts" in group_data:
+                for hostname, host_vars in group_data["hosts"].items():
+                    merged_vars = {**current_vars, **(host_vars or {})}
+                    hosts_found.append((hostname, merged_vars))
+
+            # Recursively process child groups
+            if "children" in group_data:
+                for child_name, child_data in group_data["children"].items():
+                    # Child groups in Ansible are often just references (empty {})
+                    # We need to find the actual group definition
+                    if not child_data or (not child_data.get("hosts") and not child_data.get("children")):
+                        # This is a reference - find the actual group definition
+                        actual_child_group = find_group(inventory, child_name)
+                        if actual_child_group:
+                            hosts_found.extend(get_hosts_from_group(actual_child_group, current_vars))
+                    else:
+                        # This is an inline definition - process directly
+                        hosts_found.extend(get_hosts_from_group(child_data, current_vars))
+
+            return hosts_found
+
+        # Get Pi-hole group name from env (configurable)
+        pihole_group_name = os.getenv("PIHOLE_ANSIBLE_GROUP", "PiHole")
+
+        # Find and process Pi-hole hosts
+        pihole_group = find_group(inventory, pihole_group_name)
+        if pihole_group:
+            pihole_hosts_list = get_hosts_from_group(pihole_group)
+            logger.info(f"Found {len(pihole_hosts_list)} hosts in {pihole_group_name} group")
+
+            for hostname, host_vars in pihole_hosts_list:
                 display_name = (
                     hostname.split(".")[0].replace("-", " ").title().replace(" ", "-")
                 )
-                host = host_vars.get("ansible_host", hostname.split(".")[0])
+                host = host_vars.get("ansible_host", host_vars.get("static_ip", hostname.split(".")[0]))
                 port = host_vars.get("pihole_port", 80)
 
                 # Get API key from environment variable
@@ -87,6 +148,8 @@ def load_pihole_hosts_from_ansible():
 
                 pihole_hosts.append((display_name, host, port, api_key))
                 logger.info(f"Found Pi-hole host: {display_name} -> {host}:{port}")
+        else:
+            logger.debug(f"Pi-hole group '{pihole_group_name}' not found in inventory")
 
         if not pihole_hosts:
             logger.warning("No Pi-hole hosts found in Ansible inventory")
@@ -95,7 +158,7 @@ def load_pihole_hosts_from_ansible():
         return pihole_hosts
 
     except Exception as e:
-        logger.error(f"Error loading Ansible inventory: {e}")
+        logger.error(f"Error processing Ansible inventory: {e}")
         logger.warning("Falling back to .env configuration")
         return load_pihole_hosts_from_env()
 
@@ -145,14 +208,68 @@ def load_pihole_hosts_from_env():
     return pihole_hosts
 
 
-# Load Pi-hole hosts on startup
-PIHOLE_HOSTS = load_pihole_hosts_from_ansible()
+# Load Pi-hole hosts on startup (module-level for standalone mode)
+PIHOLE_HOSTS = []
 
-if not PIHOLE_HOSTS:
-    logger.error("No Pi-hole hosts configured!")
-    logger.error(
-        "Please set ANSIBLE_INVENTORY_PATH or PIHOLE_*_HOST environment variables"
-    )
+if __name__ == "__main__":
+    PIHOLE_HOSTS = load_pihole_hosts_from_ansible()
+
+    if not PIHOLE_HOSTS:
+        logger.error("No Pi-hole hosts configured!")
+        logger.error(
+            "Please set ANSIBLE_INVENTORY_PATH or PIHOLE_*_HOST environment variables"
+        )
+
+
+class PiholeMCPServer:
+    """Pi-hole MCP Server - Class-based implementation"""
+
+    def __init__(self, ansible_inventory=None):
+        """Initialize configuration using existing config loading logic
+
+        Args:
+            ansible_inventory: Optional pre-loaded Ansible inventory dict (for unified mode)
+        """
+        # Load environment configuration (skip if in unified mode)
+        if not os.getenv("MCP_UNIFIED_MODE"):
+            load_env_file(ENV_FILE, allowed_vars=PIHOLE_ALLOWED_VARS, strict=True)
+
+        self.ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
+        logger.info(f"[PiholeMCPServer] Ansible inventory: {self.ansible_inventory_path}")
+
+        # Load Pi-hole hosts (use pre-loaded inventory if provided)
+        self.pihole_hosts = load_pihole_hosts_from_ansible(ansible_inventory)
+
+        if not self.pihole_hosts:
+            logger.warning("[PiholeMCPServer] No Pi-hole hosts configured!")
+
+        # Session cache for this instance
+        self.session_cache = {}
+
+    async def list_tools(self) -> list[types.Tool]:
+        """Return list of Tool objects this server provides (with pihole_ prefix)"""
+        return [
+            types.Tool(
+                name="pihole_get_stats",
+                description="Get DNS statistics from all Pi-hole instances",
+                inputSchema={"type": "object", "properties": {}},
+            ),
+            types.Tool(
+                name="pihole_get_status",
+                description="Check which Pi-hole instances are online",
+                inputSchema={"type": "object", "properties": {}},
+            ),
+        ]
+
+    async def handle_tool(self, tool_name: str, arguments: dict | None) -> list[types.TextContent]:
+        """Route tool calls to appropriate handler methods"""
+        # Strip the pihole_ prefix for routing
+        name = tool_name.replace("pihole_", "", 1) if tool_name.startswith("pihole_") else tool_name
+
+        logger.info(f"[PiholeMCPServer] Tool called: {tool_name} -> {name} with args: {arguments}")
+
+        # Call the shared implementation with this instance's hosts and session cache
+        return await handle_call_tool_impl(name, arguments, self.pihole_hosts, self.session_cache)
 
 
 async def get_pihole_session(host: str, port: int, password: str) -> dict:
@@ -199,7 +316,7 @@ async def get_pihole_session(host: str, port: int, password: str) -> dict:
 
 
 async def get_cached_session(
-    display_name: str, host: str, port: int, api_key: str
+    display_name: str, host: str, port: int, api_key: str, session_cache: dict
 ) -> dict:
     """
     Get a valid session from cache or create a new one
@@ -212,8 +329,8 @@ async def get_cached_session(
 
     # Check if we have a valid cached session
     cache_key = display_name
-    if cache_key in SESSION_CACHE:
-        cached = SESSION_CACHE[cache_key]
+    if cache_key in session_cache:
+        cached = session_cache[cache_key]
         if datetime.now() < cached["expires_at"]:
             # Session still valid
             return {"sid": cached["sid"]}
@@ -225,7 +342,7 @@ async def get_cached_session(
 
     if "error" not in session_info:
         # Cache the new session
-        SESSION_CACHE[cache_key] = session_info
+        session_cache[cache_key] = session_info
         logger.info(
             f"New session obtained for {display_name}, expires at {session_info['expires_at']}"
         )
@@ -283,21 +400,20 @@ async def handle_list_tools() -> list[types.Tool]:
     ]
 
 
-@server.call_tool()
-async def handle_call_tool(
-    name: str, arguments: dict | None
+async def handle_call_tool_impl(
+    name: str, arguments: dict | None, pihole_hosts: list, session_cache: dict
 ) -> list[types.TextContent]:
-    """Handle tool calls"""
+    """Core tool execution logic that can be called by both class and module-level handlers"""
     try:
-        if name == "get_pihole_stats":
+        if name == "get_stats" or name == "get_pihole_stats":
             output = "=== PI-HOLE DNS STATISTICS ===\n\n"
 
-            for display_name, host, port, api_key in PIHOLE_HOSTS:
+            for display_name, host, port, api_key in pihole_hosts:
                 output += f"--- {display_name} ---\n"
 
                 # Get session
                 session_result = await get_cached_session(
-                    display_name, host, port, api_key
+                    display_name, host, port, api_key, session_cache
                 )
 
                 if "error" in session_result:
@@ -333,14 +449,14 @@ async def handle_call_tool(
 
             return [types.TextContent(type="text", text=output)]
 
-        elif name == "get_pihole_status":
+        elif name == "get_status" or name == "get_pihole_status":
             output = "=== PI-HOLE STATUS ===\n\n"
             online = 0
 
-            for display_name, host, port, api_key in PIHOLE_HOSTS:
+            for display_name, host, port, api_key in pihole_hosts:
                 # Try to get a session (which tests connectivity and auth)
                 session_result = await get_cached_session(
-                    display_name, host, port, api_key
+                    display_name, host, port, api_key, session_cache
                 )
 
                 if "error" in session_result:
@@ -349,7 +465,7 @@ async def handle_call_tool(
                     online += 1
                     output += f"✓ {display_name} ({host}:{port}): ONLINE\n"
 
-            output = f"Online: {online}/{len(PIHOLE_HOSTS)}\n\n" + output
+            output = f"Online: {online}/{len(pihole_hosts)}\n\n" + output
             return [types.TextContent(type="text", text=output)]
 
         else:
@@ -358,6 +474,15 @@ async def handle_call_tool(
     except Exception as e:
         logger.error(f"Error in tool {name}: {str(e)}")
         return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+@server.call_tool()
+async def handle_call_tool(
+    name: str, arguments: dict | None
+) -> list[types.TextContent]:
+    """Handle tool calls (module-level wrapper for standalone mode)"""
+    # For standalone mode, use the global variables
+    return await handle_call_tool_impl(name, arguments, PIHOLE_HOSTS, SESSION_CACHE)
 
 
 async def main():

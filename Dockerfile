@@ -31,6 +31,7 @@ COPY --chown=mcpuser:mcpuser requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy MCP server files
+COPY --chown=mcpuser:mcpuser homelab_unified_mcp.py .
 COPY --chown=mcpuser:mcpuser docker_mcp_podman.py .
 COPY --chown=mcpuser:mcpuser ping_mcp_server.py .
 COPY --chown=mcpuser:mcpuser ollama_mcp.py .
@@ -49,8 +50,8 @@ USER mcpuser
 
 # Environment variables with defaults
 ENV PYTHONUNBUFFERED=1 \
-    ANSIBLE_INVENTORY_PATH=/config/ansible_hosts.yml \
-    ENABLED_SERVERS=docker,ping
+    # ENABLED_SERVERS=docker,ping \
+    ANSIBLE_INVENTORY_PATH=/config/ansible_hosts.yml 
 
 # Expose stdio for MCP communication
 # MCP servers communicate over stdin/stdout, no ports needed
