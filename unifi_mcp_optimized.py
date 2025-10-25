@@ -38,7 +38,9 @@ UNIFI_ALLOWED_VARS = COMMON_ALLOWED_ENV_VARS | {
     "UNIFI_API_KEY",
 }
 
-load_env_file(ENV_FILE, allowed_vars=UNIFI_ALLOWED_VARS, strict=True)
+# Only load env file at module level if not in unified mode
+if not os.getenv("MCP_UNIFIED_MODE"):
+    load_env_file(ENV_FILE, allowed_vars=UNIFI_ALLOWED_VARS, strict=True)
 
 UNIFI_EXPORTER_PATH = SCRIPT_DIR / "unifi_exporter.py"
 UNIFI_HOST = os.getenv("UNIFI_HOST", "192.168.1.1")
@@ -50,21 +52,84 @@ CACHE_DIR.mkdir(exist_ok=True)
 CACHE_DURATION = timedelta(minutes=5)  # Cache data for 5 minutes
 
 
-logger.info(f"Unifi host: {UNIFI_HOST}")
-logger.info(f"API key configured: {'Yes' if UNIFI_API_KEY else 'No'}")
-logger.info(f"Cache directory: {CACHE_DIR}")
+if __name__ == "__main__":
+    logger.info(f"Unifi host: {UNIFI_HOST}")
+    logger.info(f"API key configured: {'Yes' if UNIFI_API_KEY else 'No'}")
+    logger.info(f"Cache directory: {CACHE_DIR}")
 
 
-def get_cached_data():
+class UnifiMCPServer:
+    """Unifi Network MCP Server - Class-based implementation"""
+
+    def __init__(self):
+        """Initialize configuration using existing config loading logic"""
+        # Load environment configuration (skip if in unified mode)
+        if not os.getenv("MCP_UNIFIED_MODE"):
+            load_env_file(ENV_FILE, allowed_vars=UNIFI_ALLOWED_VARS, strict=True)
+
+        self.unifi_exporter_path = SCRIPT_DIR / "unifi_exporter.py"
+        self.unifi_host = os.getenv("UNIFI_HOST", "192.168.1.1")
+        self.unifi_api_key = os.getenv("UNIFI_API_KEY", "")
+
+        # Cache configuration - each instance gets its own cache
+        self.cache_dir = Path(tempfile.gettempdir()) / f"unifi_mcp_cache_{id(self)}"
+        self.cache_dir.mkdir(exist_ok=True)
+        self.cache_duration = timedelta(minutes=5)
+
+        logger.info(f"[UnifiMCPServer] Unifi host: {self.unifi_host}")
+        logger.info(f"[UnifiMCPServer] API key configured: {'Yes' if self.unifi_api_key else 'No'}")
+        logger.info(f"[UnifiMCPServer] Cache directory: {self.cache_dir}")
+
+    async def list_tools(self) -> list[types.Tool]:
+        """Return list of Tool objects this server provides (with unifi_ prefix)"""
+        return [
+            types.Tool(
+                name="unifi_get_network_devices",
+                description="Get all Unifi network devices (switches, APs, gateways) with status and basic info. This is cached for better performance.",
+                inputSchema={"type": "object", "properties": {}, "required": []},
+            ),
+            types.Tool(
+                name="unifi_get_network_clients",
+                description="Get all active network clients and their connections. This is cached for better performance.",
+                inputSchema={"type": "object", "properties": {}, "required": []},
+            ),
+            types.Tool(
+                name="unifi_get_network_summary",
+                description="Get network overview: VLANs, device count, client count. Fast summary view.",
+                inputSchema={"type": "object", "properties": {}, "required": []},
+            ),
+            types.Tool(
+                name="unifi_refresh_network_data",
+                description="Force refresh network data from Unifi controller (bypasses cache).",
+                inputSchema={"type": "object", "properties": {}, "required": []},
+            ),
+        ]
+
+    async def handle_tool(self, tool_name: str, arguments: dict | None) -> list[types.TextContent]:
+        """Route tool calls to appropriate handler methods"""
+        # Strip the unifi_ prefix for routing
+        name = tool_name.replace("unifi_", "", 1) if tool_name.startswith("unifi_") else tool_name
+
+        logger.info(f"[UnifiMCPServer] Tool called: {tool_name} -> {name} with args: {arguments}")
+
+        # Call the shared implementation with this instance's config
+        return await handle_call_tool_impl(
+            name, arguments,
+            self.unifi_exporter_path, self.unifi_host, self.unifi_api_key,
+            self.cache_dir, self.cache_duration
+        )
+
+
+def get_cached_data(cache_dir: Path, cache_duration: timedelta):
     """Get cached Unifi data if available and not expired"""
-    cache_file = CACHE_DIR / "unifi_data.json"
+    cache_file = cache_dir / "unifi_data.json"
 
     if not cache_file.exists():
         return None
 
     # Check if cache is still valid
     cache_time = datetime.fromtimestamp(cache_file.stat().st_mtime)
-    if datetime.now() - cache_time > CACHE_DURATION:
+    if datetime.now() - cache_time > cache_duration:
         logger.info("Cache expired")
         return None
 
@@ -78,9 +143,9 @@ def get_cached_data():
         return None
 
 
-def save_cached_data(data):
+def save_cached_data(data, cache_dir: Path):
     """Save Unifi data to cache"""
-    cache_file = CACHE_DIR / "unifi_data.json"
+    cache_file = cache_dir / "unifi_data.json"
     try:
         with open(cache_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
@@ -89,13 +154,13 @@ def save_cached_data(data):
         logger.error(f"Error saving cache: {e}")
 
 
-async def fetch_unifi_data():
+async def fetch_unifi_data(exporter_path: Path, unifi_host: str, unifi_api_key: str, cache_dir: Path):
     """Fetch fresh data from Unifi exporter"""
-    if not UNIFI_EXPORTER_PATH.exists():
-        raise FileNotFoundError(f"Exporter not found at {UNIFI_EXPORTER_PATH}")
+    if not exporter_path.exists():
+        raise FileNotFoundError(f"Exporter not found at {exporter_path}")
 
-    if not UNIFI_API_KEY:
-        raise ValueError("UNIFI_API_KEY not set in .env file")
+    if not unifi_api_key:
+        raise ValueError("UNIFI_API_KEY not set")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         logger.info(f"Running Unifi exporter...")
@@ -107,11 +172,11 @@ async def fetch_unifi_data():
 
         cmd = [
             "python",
-            str(UNIFI_EXPORTER_PATH),
+            str(exporter_path),
             "--host",
-            UNIFI_HOST,
+            unifi_host,
             "--api-key",
-            UNIFI_API_KEY,
+            unifi_api_key,
             "--format",
             "json",
             "--output-dir",
@@ -159,21 +224,21 @@ async def fetch_unifi_data():
             data = json.load(f)
 
         # Save to cache
-        save_cached_data(data)
+        save_cached_data(data, cache_dir)
 
         return data
 
 
-async def get_unifi_data():
+async def get_unifi_data(exporter_path: Path, unifi_host: str, unifi_api_key: str, cache_dir: Path, cache_duration: timedelta):
     """Get Unifi data from cache or fetch fresh"""
     # Try cache first
-    data = get_cached_data()
+    data = get_cached_data(cache_dir, cache_duration)
     if data:
         return data
 
     # Fetch fresh data
     logger.info("Fetching fresh Unifi data...")
-    return await fetch_unifi_data()
+    return await fetch_unifi_data(exporter_path, unifi_host, unifi_api_key, cache_dir)
 
 
 @server.list_tools()
@@ -203,25 +268,28 @@ async def handle_list_tools() -> list[types.Tool]:
     ]
 
 
-@server.call_tool()
-async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent]:
-    """Handle tool calls"""
+async def handle_call_tool_impl(
+    name: str, arguments: dict | None,
+    exporter_path: Path, unifi_host: str, unifi_api_key: str,
+    cache_dir: Path, cache_duration: timedelta
+) -> list[types.TextContent]:
+    """Core tool execution logic that can be called by both class and module-level handlers"""
     try:
         if name == "get_network_devices":
-            data = await get_unifi_data()
+            data = await get_unifi_data(exporter_path, unifi_host, unifi_api_key, cache_dir, cache_duration)
             return format_network_devices(data)
 
         elif name == "get_network_clients":
-            data = await get_unifi_data()
+            data = await get_unifi_data(exporter_path, unifi_host, unifi_api_key, cache_dir, cache_duration)
             return format_network_clients(data)
 
         elif name == "get_network_summary":
-            data = await get_unifi_data()
+            data = await get_unifi_data(exporter_path, unifi_host, unifi_api_key, cache_dir, cache_duration)
             return format_network_summary(data)
 
         elif name == "refresh_network_data":
             logger.info("Force refreshing network data...")
-            data = await fetch_unifi_data()
+            data = await fetch_unifi_data(exporter_path, unifi_host, unifi_api_key, cache_dir)
             return [
                 types.TextContent(
                     type="text",
@@ -235,6 +303,17 @@ async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent
     except Exception as e:
         logger.error(f"Error in {name}: {str(e)}", exc_info=True)
         return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+@server.call_tool()
+async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+    """Handle tool calls (module-level wrapper for standalone mode)"""
+    # For standalone mode, use the global variables
+    return await handle_call_tool_impl(
+        name, arguments,
+        UNIFI_EXPORTER_PATH, UNIFI_HOST, UNIFI_API_KEY,
+        CACHE_DIR, CACHE_DURATION
+    )
 
 
 def format_network_devices(data: dict) -> list[types.TextContent]:
