@@ -13,11 +13,16 @@ PROJECT_INSTRUCTIONS.md
 # Real Ansible inventory with actual IP addresses
 ansible_hosts.yml
 
+claude_desktop_config.json
+
 # Python cache
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+
+# Node modules
+node_modules/
 
 # Virtual environments
 venv/
@@ -50,3 +55,9 @@ test_*.py
 
 # Archive directory
 archive-ignore/
+
+# Snyk Security Extension - AI Rules (auto-generated)
+.github/instructions/snyk_rules.instructions.md
+
+#backup files
+*.bak*
