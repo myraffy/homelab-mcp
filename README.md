@@ -200,6 +200,14 @@ pip install -r requirements.txt
     "ansible-inventory": {
       "command": "python",
       "args": ["C:\\Path\\To\\Homelab-MCP\\ansible_mcp_server.py"]
+    },
+    "ping": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\ping_mcp_server.py"]
+    },
+    "ups-monitor": {
+      "command": "python",
+      "args": ["C:\\Path\\To\\Homelab-MCP\\ups_mcp_server.py"]
     }
   }
 }
@@ -504,6 +512,133 @@ ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
 - **Network troubleshooting** - Isolate connectivity issues from service issues
 - **Health monitoring** - Regular checks to ensure infrastructure availability
 
+### UPS Monitoring (Network UPS Tools)
+
+Monitor UPS (Uninterruptible Power Supply) devices across your infrastructure using Network UPS Tools (NUT) protocol.
+
+**Why use this?**
+
+- Real-time visibility into power infrastructure status
+- Proactive alerts before battery depletion during outages
+- Monitor multiple UPS devices across different hosts
+- Track battery health and runtime estimates
+- Essential for critical infrastructure planning
+
+**Tools:**
+
+- `get_ups_status` - Check status of all UPS devices across all NUT servers
+- `get_ups_details` - Get detailed information for a specific UPS device
+- `get_battery_runtime` - Get battery runtime estimates for all UPS devices
+- `get_power_events` - Check for recent power events (on battery, low battery)
+- `list_ups_devices` - List all UPS devices configured in inventory
+- `reload_inventory` - Reload Ansible inventory after changes
+
+**Features:**
+
+- ✅ **NUT protocol support** - Uses Network UPS Tools standard protocol (port 3493)
+- ✅ **Ansible integration** - Automatically discovers UPS from inventory
+- ✅ **Multiple UPS per host** - Support for servers with multiple UPS devices
+- ✅ **Battery monitoring** - Track charge level, runtime remaining, load percentage
+- ✅ **Power event detection** - Identify when UPS switches to battery or low battery
+- ✅ **Cross-platform** - Works with any NUT-compatible UPS (TrippLite, APC, CyberPower, etc.)
+- ✅ **Flexible auth** - Optional username/password authentication
+
+**Configuration:**
+
+**Option 1: Using Ansible Inventory (Recommended)**
+
+```bash
+ANSIBLE_INVENTORY_PATH=/path/to/ansible_hosts.yml
+
+# Default NUT port (optional, defaults to 3493)
+NUT_PORT=3493
+
+# NUT authentication (optional - only if your NUT server requires it)
+NUT_USERNAME=monuser
+NUT_PASSWORD=secret
+```
+
+**Ansible inventory example:**
+
+```yaml
+nut_servers:
+  hosts:
+    dell-server.example.local:
+      ansible_host: 192.168.1.100
+      nut_port: 3493
+      ups_devices:
+        - name: tripplite
+          description: "TrippLite SMART1500LCDXL"
+```
+
+**Option 2: Using Environment Variables**
+
+```bash
+NUT_PORT=3493
+NUT_USERNAME=monuser
+NUT_PASSWORD=secret
+```
+
+**Prerequisites:**
+
+1. **Install NUT on servers with UPS devices:**
+   ```bash
+   # Debian/Ubuntu
+   sudo apt install nut nut-client nut-server
+
+   # RHEL/Rocky/CentOS
+   sudo dnf install nut nut-client
+   ```
+
+2. **Configure NUT daemon (`/etc/nut/ups.conf`):**
+   ```ini
+   [tripplite]
+       driver = usbhid-ups
+       port = auto
+       desc = "TrippLite SMART1500LCDXL"
+   ```
+
+3. **Enable network monitoring (`/etc/nut/upsd.conf`):**
+   ```ini
+   LISTEN 0.0.0.0 3493
+   ```
+
+4. **Configure access (`/etc/nut/upsd.users`):**
+   ```ini
+   [monuser]
+       password = secret
+       upsmon master
+   ```
+
+5. **Start NUT services:**
+   ```bash
+   sudo systemctl enable nut-server nut-client
+   sudo systemctl start nut-server nut-client
+   ```
+
+**Example Usage:**
+
+- "What's the status of all my UPS devices?"
+- "Show me battery runtime for the Dell server UPS"
+- "Check for any power events"
+- "Get detailed info about the TrippLite UPS"
+- "List all configured UPS devices"
+
+**When to use:**
+
+- **After power flickers** - Verify UPS devices handled the event properly
+- **Before maintenance** - Check battery levels and estimated runtime
+- **Regular monitoring** - Track UPS health and battery condition
+- **Capacity planning** - Understand how long systems can run on battery
+
+**Common UPS Status Codes:**
+
+- `OL` - Online (normal operation, AC power present)
+- `OB` - On Battery (power outage, running on battery)
+- `LB` - Low Battery (critically low battery, shutdown imminent)
+- `CHRG` - Charging (battery is charging)
+- `RB` - Replace Battery (battery needs replacement)
+
 ## 🔒 Security
 
 ### Automated Security Checks
@@ -592,6 +727,7 @@ Core dependencies:
 - **Pi-hole**: v6+ with API enabled
 - **Unifi Controller**: API access enabled
 - **Ollama**: Running instances with API accessible
+- **NUT (Network UPS Tools)**: Installed and configured on hosts with UPS devices
 - **Ansible**: Inventory file (optional but recommended)
 
 ## 💻 Compatibility

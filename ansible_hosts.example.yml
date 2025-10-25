@@ -104,6 +104,37 @@ all:
           ansible_host: 192.168.1.1
 
     # ==========================================================================
+    # UPS Monitoring (Network UPS Tools)
+    # ==========================================================================
+    nut_servers:
+      hosts:
+        dell-server.example.local:
+          ansible_host: 192.168.1.100
+          nut_port: 3493
+          nut_username: monuser  # Optional - only if NUT requires authentication
+          nut_password: ""       # Optional - set in .env as NUT_PASSWORD for security
+          ups_devices:
+            - name: tripplite
+              description: "TrippLite SMART1500LCDXL"
+
+        cyber-server.example.local:
+          ansible_host: 192.168.1.101
+          nut_port: 3493
+          ups_devices:
+            - name: ups
+              description: "APC Back-UPS"
+
+        # Example: Server with multiple UPS devices
+        # datacenter-server.example.local:
+        #   ansible_host: 192.168.1.102
+        #   nut_port: 3493
+        #   ups_devices:
+        #     - name: ups1
+        #       description: "Primary UPS - TrippLite"
+        #     - name: ups2
+        #       description: "Secondary UPS - APC"
+
+    # ==========================================================================
     # OS-Based Groups
     # ==========================================================================
     ubuntu_servers:
