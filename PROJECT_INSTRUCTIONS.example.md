@@ -137,7 +137,79 @@ You are assisting with a comprehensive homelab infrastructure that includes mult
 - "Test connectivity across entire infrastructure"
 - "What groups can I ping?" (to discover available host groups)
 
-### 7. MCP Registry Inspector (`mcp-registry-inspector`)
+### 7. UPS Monitoring (Network UPS Tools) (`ups-monitor`)
+**Purpose:** Monitor UPS (Uninterruptible Power Supply) devices across infrastructure using NUT protocol
+**Use for:** Power infrastructure monitoring, battery status, runtime estimates, power event detection
+
+**UPS Devices monitored:**
+- dell-server (192.168.1.100) - TrippLite SMART1500LCDXL
+- cyber-server (192.168.1.101) - APC Back-UPS
+- [Add your UPS devices here]
+
+**Key Capabilities:**
+- `get_ups_status` - Check all UPS devices across all NUT servers
+- `get_ups_details` - Detailed information for specific UPS
+- `get_battery_runtime` - Battery runtime estimates for all UPS
+- `get_power_events` - Check for recent power events (on battery, low battery)
+- `list_ups_devices` - List all configured UPS devices
+- `reload_inventory` - Reload Ansible inventory after changes
+
+**Features:**
+- NUT network protocol (port 3493) support
+- Multiple UPS per host support
+- Battery charge level tracking (percentage)
+- Runtime remaining estimates (minutes)
+- Load percentage monitoring
+- Power status detection (OL/OB/LB)
+- Cross-platform UPS compatibility (TrippLite, APC, CyberPower, etc.)
+- Optional authentication support
+- Voltage monitoring (input, output, battery)
+
+**Common UPS Status Codes:**
+- `OL` - Online (normal operation, AC power present)
+- `OB` - On Battery (power outage, running on battery)
+- `LB` - Low Battery (critically low, shutdown imminent)
+- `CHRG` - Charging (battery charging)
+- `RB` - Replace Battery (battery needs replacement)
+- `DISCHRG` - Discharging (battery discharging)
+- `BYPASS` - Bypass mode
+- `OVER` - Overloaded
+
+**When to use:**
+- After power flickers or outages to verify UPS handled event properly
+- Before maintenance windows to check battery levels
+- Regular monitoring to track UPS health and battery condition
+- During storms or unstable power to monitor runtime remaining
+- Capacity planning to understand backup power duration
+- Proactive alerts before battery depletion
+
+**Example workflows:**
+- "What's the status of all my UPS devices?"
+- "Show me battery runtime for the Dell server UPS"
+- "Check for any power events across infrastructure"
+- "Get detailed info about the TrippLite UPS"
+- "List all configured UPS devices"
+- "How much battery charge does the Cyber server UPS have?"
+- "Are any UPS devices on battery right now?"
+
+**Power Event Response:**
+When UPS switches to battery (`OB` status):
+1. Check runtime remaining to estimate available time
+2. Verify which hosts/services depend on that UPS
+3. Plan graceful shutdown sequence if runtime is low
+4. Monitor for return to online status (`OL`)
+
+**Critical Alerts:**
+- `OB` (On Battery) - AC power lost, running on battery
+- `LB` (Low Battery) - Immediate action required, shutdown imminent
+- `RB` (Replace Battery) - Battery health degraded, replacement needed
+
+**Integration with other MCPs:**
+- Use **Ping MCP** to verify hosts came back online after power restoration
+- Use **Docker MCP** to check which containers restarted after power event
+- Use **Ansible MCP** to identify which hosts depend on each UPS
+
+### 8. MCP Registry Inspector (`mcp-registry-inspector`)
 **Purpose:** Self-inspection and file management for MCP development
 **Use for:** Managing MCP server code, configuration updates
 
