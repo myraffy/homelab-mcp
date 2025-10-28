@@ -23,6 +23,7 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
+from ansible_config_manager import load_group_hosts
 from mcp_config_loader import COMMON_ALLOWED_ENV_VARS, load_env_file
 
 server = Server("ollama-info")
@@ -58,111 +59,25 @@ logger.info(f"LiteLLM endpoint: {LITELLM_HOST}:{LITELLM_PORT}")
 
 def load_ollama_endpoints_from_ansible(inventory=None):
     """
-    Load Ollama endpoints from Ansible inventory
+    Load Ollama endpoints from Ansible inventory using centralized config manager
     Returns dict of {display_name: ip_address}
 
     Args:
-        inventory: Optional pre-loaded Ansible inventory dict (avoids file locking in unified mode)
+        inventory: Optional pre-loaded inventory (for compatibility, unused now)
     """
-    # Use pre-loaded inventory if provided
-    if inventory is None:
-        # Get path from environment variable
-        ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
-
-        if not ansible_inventory_path or not Path(ansible_inventory_path).exists():
-            logger.warning(f"Ansible inventory not found at: {ansible_inventory_path}")
-            logger.warning("Falling back to .env configuration")
-            return load_ollama_endpoints_from_env()
-
-        try:
-            with open(ansible_inventory_path, "r") as f:
-                inventory = yaml.safe_load(f)
-        except Exception as e:
-            logger.error(f"Error loading Ansible inventory: {e}")
-            logger.warning("Falling back to .env configuration")
-            return load_ollama_endpoints_from_env()
-
-    # Process the inventory (whether pre-loaded or freshly loaded)
-    try:
-        endpoints = {}
-
-        # Helper function to find a group anywhere in the inventory tree
-        def find_group(data, target_name):
-            """Recursively search for a group by name"""
-            if isinstance(data, dict):
-                if target_name in data:
-                    return data[target_name]
-                for value in data.values():
-                    if isinstance(value, dict):
-                        result = find_group(value, target_name)
-                        if result:
-                            return result
-            return None
-
-        # Helper function to recursively find all hosts in a group
-        def get_hosts_from_group(group_data, inherited_vars=None):
-            """Recursively extract hosts from a group and its children"""
-            inherited_vars = inherited_vars or {}
-            hosts_found = []
-
-            # Merge current group vars with inherited vars
-            current_vars = {**inherited_vars, **group_data.get("vars", {})}
-
-            # Get direct hosts in this group
-            if "hosts" in group_data:
-                for hostname, host_vars in group_data["hosts"].items():
-                    merged_vars = {**current_vars, **(host_vars or {})}
-                    hosts_found.append((hostname, merged_vars))
-
-            # Recursively process child groups
-            if "children" in group_data:
-                for child_name, child_data in group_data["children"].items():
-                    # Child groups in Ansible are often just references (empty {})
-                    # We need to find the actual group definition
-                    if not child_data or (not child_data.get("hosts") and not child_data.get("children")):
-                        # This is a reference - find the actual group definition
-                        actual_child_group = find_group(inventory, child_name)
-                        if actual_child_group:
-                            hosts_found.extend(get_hosts_from_group(actual_child_group, current_vars))
-                    else:
-                        # This is an inline definition - process directly
-                        hosts_found.extend(get_hosts_from_group(child_data, current_vars))
-
-            return hosts_found
-
-        # Get Ollama group name from env (configurable)
-        ollama_group_name = os.getenv("OLLAMA_ANSIBLE_GROUP", "ollama_servers")
-
-        # Find and process Ollama hosts
-        ollama_group = find_group(inventory, ollama_group_name)
-        if ollama_group:
-            ollama_hosts_list = get_hosts_from_group(ollama_group)
-            logger.info(f"Found {len(ollama_hosts_list)} hosts in {ollama_group_name} group")
-
-            for hostname, host_vars in ollama_hosts_list:
-                # Clean up hostname for display (remove domain suffix)
-                display_name = hostname.split(".")[0]
-                # Capitalize and clean up for display
-                display_name = display_name.replace("-", " ").title().replace(" ", "-")
-
-                # Try to get IP from ansible_host var, or resolve hostname
-                ip = host_vars.get("ansible_host", host_vars.get("static_ip", hostname.split(".")[0]))
-
-                endpoints[display_name] = ip
-                logger.info(f"Found Ollama host: {display_name} -> {ip}")
-        else:
-            logger.debug(f"Ollama group '{ollama_group_name}' not found in inventory")
-
-        if not endpoints:
-            logger.warning("No Ollama hosts found in Ansible inventory")
-            return load_ollama_endpoints_from_env()
-
-        return endpoints
-
-    except Exception as e:
-        logger.error(f"Error processing Ansible inventory: {e}")
-        logger.warning("Falling back to .env configuration")
+    # Use centralized config manager - handles Ansible library or YAML fallback
+    hosts = load_group_hosts(
+        OLLAMA_INVENTORY_GROUP,
+        inventory_path=ANSIBLE_INVENTORY_PATH,
+        logger_obj=logger
+    )
+    
+    if not hosts:
+        logger.warning(f"No hosts found in '{OLLAMA_INVENTORY_GROUP}' group")
         return load_ollama_endpoints_from_env()
+    
+    logger.info(f"Found {len(hosts)} Ollama hosts from Ansible inventory")
+    return hosts
 
 
 def load_ollama_endpoints_from_env():

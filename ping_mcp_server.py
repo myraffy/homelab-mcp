@@ -22,8 +22,6 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Set, Tuple, Union
 
-import yaml
-
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
@@ -32,6 +30,7 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
+from ansible_config_manager import AnsibleConfigManager
 from mcp_config_loader import load_env_file, load_indexed_env_vars, COMMON_ALLOWED_ENV_VARS
 
 server = Server("ping-info")
@@ -113,150 +112,65 @@ def load_ansible_inventory(inventory=None):
     """
     Load and cache the Ansible inventory with full variable inheritance.
     Falls back to environment variables if Ansible inventory not found.
-    Returns dict with hosts and groups.
-
-    Properly merges variables from:
-    1. Group vars (from parent to child)
-    2. Host vars (override group vars)
-    3. Environment variables (fallback)
+    
+    Uses centralized AnsibleConfigManager which implements proper two-pass
+    variable inheritance (group vars → child vars → host vars).
 
     Args:
         inventory: Optional pre-loaded Ansible inventory dict (avoids file locking in unified mode)
+    
+    Returns:
+        Dict with structure: {"hosts": {...}, "groups": {...}}
     """
     global INVENTORY_DATA
 
-    # Use cached data if available (for standalone mode)
+    # Use cached data if available
     if INVENTORY_DATA is not None:
         return INVENTORY_DATA
 
-    # Use pre-loaded inventory if provided
-    if inventory is None:
-        # Get path from environment variable
-        ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
+    # Get ansible inventory path
+    ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
 
-        if not ansible_inventory_path or not Path(ansible_inventory_path).exists():
-            logger.warning(f"Ansible inventory not found at: {ansible_inventory_path}")
-            logger.info("Attempting to load ping targets from environment variables")
-            INVENTORY_DATA = load_ping_targets_from_env()
-            if INVENTORY_DATA and INVENTORY_DATA.get("hosts"):
-                logger.info(f"Loaded {len(INVENTORY_DATA['hosts'])} ping targets from environment")
-                return INVENTORY_DATA
-            logger.error("No ping targets configured in Ansible inventory or environment variables")
-            return {"hosts": {}, "groups": {}}
+    if not ansible_inventory_path or not Path(ansible_inventory_path).exists():
+        logger.warning(f"Ansible inventory not found at: {ansible_inventory_path}")
+        logger.info("Attempting to load ping targets from environment variables")
+        INVENTORY_DATA = load_ping_targets_from_env()
+        if INVENTORY_DATA and INVENTORY_DATA.get("hosts"):
+            logger.info(f"Loaded {len(INVENTORY_DATA['hosts'])} ping targets from environment")
+            return INVENTORY_DATA
+        logger.error("No ping targets configured in Ansible inventory or environment variables")
+        return {"hosts": {}, "groups": {}}
 
-        try:
-            with open(ansible_inventory_path, "r") as f:
-                inventory = yaml.safe_load(f)
-        except Exception as e:
-            logger.error(f"Error loading Ansible inventory: {e}", exc_info=True)
-            logger.info("Attempting to load ping targets from environment variables as fallback")
-            INVENTORY_DATA = load_ping_targets_from_env()
-            if INVENTORY_DATA and INVENTORY_DATA.get("hosts"):
-                logger.info(f"Loaded {len(INVENTORY_DATA['hosts'])} ping targets from environment variables")
-                return INVENTORY_DATA
-            return {"hosts": {}, "groups": {}}
+    # Use centralized config manager
+    manager = AnsibleConfigManager(
+        inventory_path=ansible_inventory_path,
+        logger_obj=logger
+    )
 
-    # Process the inventory (whether pre-loaded or freshly loaded)
-    try:
-
-        hosts = {}
-        groups = {}
-        group_vars = {}  # Store vars for each group
-
-        def collect_group_vars(group_name, group_data, parent_groups=None):
-            """First pass: collect all group vars"""
-            if parent_groups is None:
-                parent_groups = []
-
-            current_groups = parent_groups + [group_name]
-
-            # Store group vars
-            if group_name not in group_vars:
-                group_vars[group_name] = {}
-
-            if "vars" in group_data:
-                group_vars[group_name] = group_data["vars"].copy()
-
-            # Recursively process children
-            if "children" in group_data:
-                for child_name, child_data in group_data["children"].items():
-                    collect_group_vars(child_name, child_data, current_groups)
-
-        def process_group(
-            group_name, group_data, parent_groups=None, inherited_vars=None
-        ):
-            """Second pass: process groups with inherited vars"""
-            if parent_groups is None:
-                parent_groups = []
-            if inherited_vars is None:
-                inherited_vars = {}
-
-            current_groups = parent_groups + [group_name]
-
-            # Merge inherited vars with this group's vars
-            merged_vars = inherited_vars.copy()
-            if group_name in group_vars:
-                merged_vars.update(group_vars[group_name])
-
-            # Process hosts in this group
-            if "hosts" in group_data:
-                for hostname, host_vars in group_data["hosts"].items():
-                    if hostname not in hosts:
-                        hosts[hostname] = {"groups": [], "vars": {}}
-
-                    # Add groups
-                    hosts[hostname]["groups"].extend(current_groups)
-
-                    # Merge vars: group vars first, then host vars override
-                    hosts[hostname]["vars"].update(merged_vars)
-                    if host_vars:
-                        hosts[hostname]["vars"].update(host_vars)
-
-            # Track group membership (use set to avoid duplicates)
-            if group_name not in groups:
-                groups[group_name] = set()
-
-            # Add hosts to group tracking
-            if "hosts" in group_data:
-                groups[group_name].update(group_data["hosts"].keys())
-
-            # Process child groups with accumulated vars
-            if "children" in group_data:
-                for child_name, child_data in group_data["children"].items():
-                    process_group(child_name, child_data, current_groups, merged_vars)
-                    # Also add child group's hosts to parent group
-                    if child_name in groups:
-                        groups[group_name].update(groups[child_name])
-
-        # First pass: collect all group vars
-        all_group = inventory.get("all", {})
-        if "children" in all_group:
-            for group_name, group_data in all_group["children"].items():
-                collect_group_vars(group_name, group_data)
-
-        # Second pass: process groups with proper var inheritance
-        if "children" in all_group:
-            for group_name, group_data in all_group["children"].items():
-                process_group(group_name, group_data)
-
-        # Convert group sets to lists for JSON serialization
-        groups = {k: list(v) for k, v in groups.items()}
-
-        INVENTORY_DATA = {"hosts": hosts, "groups": groups}
-        logger.info(
-            f"Loaded {len(hosts)} hosts and {len(groups)} groups from Ansible inventory"
-        )
-
-        return INVENTORY_DATA
-
-    except Exception as e:
-        logger.error(f"Error processing Ansible inventory: {e}", exc_info=True)
+    if not manager.is_available():
+        logger.warning("Ansible inventory not accessible via AnsibleConfigManager")
         logger.info("Attempting to load ping targets from environment variables as fallback")
         INVENTORY_DATA = load_ping_targets_from_env()
         if INVENTORY_DATA and INVENTORY_DATA.get("hosts"):
             logger.info(f"Loaded {len(INVENTORY_DATA['hosts'])} ping targets from environment variables")
             return INVENTORY_DATA
         return {"hosts": {}, "groups": {}}
+
+    # Get all hosts with proper inheritance
+    INVENTORY_DATA = manager.get_all_hosts_with_inheritance()
+    
+    if not INVENTORY_DATA.get("hosts"):
+        logger.warning("No hosts found in Ansible inventory, falling back to environment variables")
+        INVENTORY_DATA = load_ping_targets_from_env()
+        if INVENTORY_DATA and INVENTORY_DATA.get("hosts"):
+            logger.info(f"Loaded {len(INVENTORY_DATA['hosts'])} ping targets from environment variables")
+            return INVENTORY_DATA
+    
+    logger.info(
+        f"Loaded {len(INVENTORY_DATA['hosts'])} hosts and {len(INVENTORY_DATA['groups'])} groups "
+        f"with variable inheritance"
+    )
+    return INVENTORY_DATA
 
 
 def get_host_ip(hostname: str, host_data: dict) -> str:
@@ -770,6 +684,10 @@ async def handle_call_tool_impl(
             output = f"=== PINGING ALL HOSTS ===\n"
             output += f"Total: {len(hostnames)} hosts, Packets: {count}, Timeout: {timeout}s\n\n"
 
+            if not hostnames:
+                output += "No hosts found in inventory\n"
+                return [types.TextContent(type="text", text=output)]
+
             # Ping all hosts concurrently
             tasks = []
             for hostname in hostnames:
@@ -788,7 +706,10 @@ async def handle_call_tool_impl(
             # Summary
             reachable = sum(1 for r in results if r["reachable"])
             output += f"\n--- SUMMARY ---\n"
-            output += f"Reachable: {reachable}/{len(results)} ({(reachable/len(results)*100):.1f}%)\n"
+            if len(results) > 0:
+                output += f"Reachable: {reachable}/{len(results)} ({(reachable/len(results)*100):.1f}%)\n"
+            else:
+                output += "No results to summarize\n"
 
             return [types.TextContent(type="text", text=output)]
 
