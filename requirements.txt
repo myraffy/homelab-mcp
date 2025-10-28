@@ -1,6 +1,10 @@
 # MCP Server Framework
 mcp>=1.0.0
 
+# Ansible configuration management (official library)
+# Falls back to manual YAML parsing on unsupported systems (e.g., Windows)
+ansible>=2.9,<3.0
+
 # Async HTTP client for Docker API, Ollama, Pi-hole
 aiohttp>=3.9.0
 
