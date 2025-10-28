@@ -24,6 +24,7 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
+from ansible_config_manager import AnsibleConfigManager
 from mcp_config_loader import load_env_file, load_indexed_env_vars, COMMON_ALLOWED_ENV_VARS
 
 # Module-level initialization for standalone mode
@@ -48,130 +49,55 @@ if __name__ == "__main__":
 
 def load_container_hosts_from_ansible(inventory=None):
     """
-    Load container hosts from Ansible inventory
+    Load container hosts from Ansible inventory using centralized config manager
     Returns dict of {hostname: {'endpoint': 'ip:port', 'runtime': 'docker|podman'}}
 
     Args:
-        inventory: Optional pre-loaded Ansible inventory dict (avoids file locking in unified mode)
+        inventory: Optional pre-loaded inventory (for compatibility, unused now)
     """
-    # Use pre-loaded inventory if provided
-    if inventory is None:
-        # Get path from environment variable
-        ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
-
-        if not ansible_inventory_path or not Path(ansible_inventory_path).exists():
-            logger.warning(f"Ansible inventory not found at: {ansible_inventory_path}")
-            logger.warning("Falling back to .env configuration")
-            return load_container_hosts_from_env()
-
-        try:
-            with open(ansible_inventory_path, "r") as f:
-                inventory = yaml.safe_load(f)
-        except Exception as e:
-            logger.error(f"Error loading Ansible inventory: {e}")
-            logger.warning("Falling back to .env configuration")
-            return load_container_hosts_from_env()
-
-    # Process the inventory (whether pre-loaded or freshly loaded)
-    try:
-        container_hosts = {}
-
-        # Helper function to find a group anywhere in the inventory tree
-        def find_group(data, target_name):
-            """Recursively search for a group by name"""
-            if isinstance(data, dict):
-                if target_name in data:
-                    return data[target_name]
-                for value in data.values():
-                    if isinstance(value, dict):
-                        result = find_group(value, target_name)
-                        if result:
-                            return result
-            return None
-
-        # Helper function to recursively find all hosts in a group
-        def get_hosts_from_group(group_data, inherited_vars=None):
-            """Recursively extract hosts from a group and its children"""
-            inherited_vars = inherited_vars or {}
-            hosts_found = []
-
-            # Merge current group vars with inherited vars
-            current_vars = {**inherited_vars, **group_data.get("vars", {})}
-
-            # Get direct hosts in this group
-            if "hosts" in group_data:
-                for hostname, host_vars in group_data["hosts"].items():
-                    merged_vars = {**current_vars, **(host_vars or {})}
-                    hosts_found.append((hostname, merged_vars))
-
-            # Recursively process child groups
-            if "children" in group_data:
-                for child_name, child_data in group_data["children"].items():
-                    # Child groups in Ansible are often just references (empty {})
-                    # We need to find the actual group definition
-                    if not child_data or (not child_data.get("hosts") and not child_data.get("children")):
-                        # This is a reference - find the actual group definition
-                        actual_child_group = find_group(inventory, child_name)
-                        if actual_child_group:
-                            hosts_found.extend(get_hosts_from_group(actual_child_group, current_vars))
-                    else:
-                        # This is an inline definition - process directly
-                        hosts_found.extend(get_hosts_from_group(child_data, current_vars))
-
-            return hosts_found
-
-        # Get Docker group name from env (configurable)
-        docker_group_name = os.getenv("DOCKER_ANSIBLE_GROUP", "Ubuntu_Server")
-        podman_group_name = os.getenv("PODMAN_ANSIBLE_GROUP", "podman_hosts")
-
-        # Find and process Docker hosts
-        docker_group = find_group(inventory, docker_group_name)
-        if docker_group:
-            docker_hosts_list = get_hosts_from_group(docker_group)
-            logger.info(f"Found {len(docker_hosts_list)} hosts in {docker_group_name} group")
-
-            for hostname, host_vars in docker_hosts_list:
-                display_name = hostname.split(".")[0]
-                ip = host_vars.get("ansible_host", host_vars.get("static_ip", hostname.split(".")[0]))
-                port = host_vars.get("docker_api_port", 2375)
-
-                container_hosts[display_name] = {
-                    "endpoint": f"{ip}:{port}",
-                    "runtime": "docker",
-                }
-                logger.info(f"Found Docker host: {display_name} -> {ip}:{port}")
-        else:
-            logger.debug(f"Docker group '{docker_group_name}' not found in inventory")
-
-        # Find and process Podman hosts
-        podman_group = find_group(inventory, podman_group_name)
-        if podman_group:
-            podman_hosts_list = get_hosts_from_group(podman_group)
-            logger.info(f"Found {len(podman_hosts_list)} hosts in {podman_group_name} group")
-
-            for hostname, host_vars in podman_hosts_list:
-                display_name = hostname.split(".")[0]
-                ip = host_vars.get("ansible_host", host_vars.get("static_ip", hostname.split(".")[0]))
-                port = host_vars.get("podman_api_port", 8080)
-
-                container_hosts[display_name] = {
-                    "endpoint": f"{ip}:{port}",
-                    "runtime": "podman",
-                }
-                logger.info(f"Found Podman host: {display_name} -> {ip}:{port}")
-        else:
-            logger.debug(f"Podman group '{podman_group_name}' not found in inventory")
-
-        if not container_hosts:
-            logger.warning("No container hosts found in Ansible inventory")
-            return load_container_hosts_from_env()
-
-        return container_hosts
-
-    except Exception as e:
-        logger.error(f"Error processing Ansible inventory: {e}")
-        logger.warning("Falling back to .env configuration")
+    ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
+    if not ansible_inventory_path:
+        logger.warning("No Ansible inventory path provided")
         return load_container_hosts_from_env()
+
+    container_hosts = {}
+    manager = AnsibleConfigManager(
+        inventory_path=ansible_inventory_path,
+        logger_obj=logger
+    )
+
+    if not manager.is_available():
+        logger.warning("Ansible not available, using .env fallback")
+        return load_container_hosts_from_env()
+
+    # Load Docker hosts
+    docker_group_name = os.getenv("DOCKER_ANSIBLE_GROUP", "Ubuntu_Server")
+    docker_hosts = manager.get_group_hosts(docker_group_name)
+    for hostname, ip in docker_hosts.items():
+        port = manager.get_host_variable(hostname, "docker_api_port", "2375")
+        container_hosts[hostname] = {
+            "endpoint": f"{ip}:{port}",
+            "runtime": "docker",
+        }
+        logger.info(f"Found Docker host: {hostname} -> {ip}:{port}")
+
+    # Load Podman hosts
+    podman_group_name = os.getenv("PODMAN_ANSIBLE_GROUP", "podman_hosts")
+    podman_hosts = manager.get_group_hosts(podman_group_name)
+    for hostname, ip in podman_hosts.items():
+        port = manager.get_host_variable(hostname, "podman_api_port", "8080")
+        container_hosts[hostname] = {
+            "endpoint": f"{ip}:{port}",
+            "runtime": "podman",
+        }
+        logger.info(f"Found Podman host: {hostname} -> {ip}:{port}")
+
+    if not container_hosts:
+        logger.warning("No container hosts found in Ansible inventory")
+        return load_container_hosts_from_env()
+
+    logger.info(f"Loaded {len(container_hosts)} container hosts from Ansible")
+    return container_hosts
 
 
 def load_container_hosts_from_env():

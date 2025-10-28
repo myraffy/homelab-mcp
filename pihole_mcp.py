@@ -26,6 +26,7 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
+from ansible_config_manager import load_group_hosts
 from mcp_config_loader import load_env_file, COMMON_ALLOWED_ENV_VARS
 
 server = Server("pihole-info")
@@ -53,114 +54,33 @@ SESSION_CACHE = {}
 
 def load_pihole_hosts_from_ansible(inventory=None):
     """
-    Load Pi-hole hosts from Ansible inventory
+    Load Pi-hole hosts from Ansible inventory using centralized config manager
     Returns list of tuples: [(display_name, host, port, api_key), ...]
 
     Args:
-        inventory: Optional pre-loaded Ansible inventory dict (avoids file locking in unified mode)
+        inventory: Optional pre-loaded inventory (for compatibility, unused now)
     """
-    # Use pre-loaded inventory if provided
-    if inventory is None:
-        # Get path from environment variable
-        ansible_inventory_path = os.getenv("ANSIBLE_INVENTORY_PATH", "")
+    # Use centralized config manager
+    pihole_group_name = os.getenv("PIHOLE_ANSIBLE_GROUP", "PiHole")
+    hosts = load_group_hosts(
+        pihole_group_name,
+        inventory_path=ANSIBLE_INVENTORY_PATH,
+        logger_obj=logger
+    )
 
-        if not ansible_inventory_path or not Path(ansible_inventory_path).exists():
-            logger.warning(f"Ansible inventory not found at: {ansible_inventory_path}")
-            logger.warning("Falling back to .env configuration")
-            return load_pihole_hosts_from_env()
-
-        try:
-            with open(ansible_inventory_path, "r") as f:
-                inventory = yaml.safe_load(f)
-        except Exception as e:
-            logger.error(f"Error loading Ansible inventory: {e}")
-            logger.warning("Falling back to .env configuration")
-            return load_pihole_hosts_from_env()
-
-    # Process the inventory (whether pre-loaded or freshly loaded)
-    try:
-        pihole_hosts = []
-
-        # Helper function to find a group anywhere in the inventory tree
-        def find_group(data, target_name):
-            """Recursively search for a group by name"""
-            if isinstance(data, dict):
-                if target_name in data:
-                    return data[target_name]
-                for value in data.values():
-                    if isinstance(value, dict):
-                        result = find_group(value, target_name)
-                        if result:
-                            return result
-            return None
-
-        # Helper function to recursively find all hosts in a group
-        def get_hosts_from_group(group_data, inherited_vars=None):
-            """Recursively extract hosts from a group and its children"""
-            inherited_vars = inherited_vars or {}
-            hosts_found = []
-
-            # Merge current group vars with inherited vars
-            current_vars = {**inherited_vars, **group_data.get("vars", {})}
-
-            # Get direct hosts in this group
-            if "hosts" in group_data:
-                for hostname, host_vars in group_data["hosts"].items():
-                    merged_vars = {**current_vars, **(host_vars or {})}
-                    hosts_found.append((hostname, merged_vars))
-
-            # Recursively process child groups
-            if "children" in group_data:
-                for child_name, child_data in group_data["children"].items():
-                    # Child groups in Ansible are often just references (empty {})
-                    # We need to find the actual group definition
-                    if not child_data or (not child_data.get("hosts") and not child_data.get("children")):
-                        # This is a reference - find the actual group definition
-                        actual_child_group = find_group(inventory, child_name)
-                        if actual_child_group:
-                            hosts_found.extend(get_hosts_from_group(actual_child_group, current_vars))
-                    else:
-                        # This is an inline definition - process directly
-                        hosts_found.extend(get_hosts_from_group(child_data, current_vars))
-
-            return hosts_found
-
-        # Get Pi-hole group name from env (configurable)
-        pihole_group_name = os.getenv("PIHOLE_ANSIBLE_GROUP", "PiHole")
-
-        # Find and process Pi-hole hosts
-        pihole_group = find_group(inventory, pihole_group_name)
-        if pihole_group:
-            pihole_hosts_list = get_hosts_from_group(pihole_group)
-            logger.info(f"Found {len(pihole_hosts_list)} hosts in {pihole_group_name} group")
-
-            for hostname, host_vars in pihole_hosts_list:
-                display_name = (
-                    hostname.split(".")[0].replace("-", " ").title().replace(" ", "-")
-                )
-                host = host_vars.get("ansible_host", host_vars.get("static_ip", hostname.split(".")[0]))
-                port = host_vars.get("pihole_port", 80)
-
-                # Get API key from environment variable
-                # Convert Server1 to PIHOLE_API_KEY_SERVER1
-                env_key = f"PIHOLE_API_KEY_{display_name.replace('-', '_').upper()}"
-                api_key = os.getenv(env_key, "")
-
-                pihole_hosts.append((display_name, host, port, api_key))
-                logger.info(f"Found Pi-hole host: {display_name} -> {host}:{port}")
-        else:
-            logger.debug(f"Pi-hole group '{pihole_group_name}' not found in inventory")
-
-        if not pihole_hosts:
-            logger.warning("No Pi-hole hosts found in Ansible inventory")
-            return load_pihole_hosts_from_env()
-
-        return pihole_hosts
-
-    except Exception as e:
-        logger.error(f"Error processing Ansible inventory: {e}")
-        logger.warning("Falling back to .env configuration")
+    if not hosts:
+        logger.warning(f"No hosts found in '{pihole_group_name}' group")
         return load_pihole_hosts_from_env()
+
+    pihole_hosts = []
+    for display_name, host in hosts.items():
+        port = 80  # Default Pi-hole port
+        api_key = os.getenv(f"PIHOLE_API_KEY_{display_name.replace('-', '_').upper()}", "")
+        pihole_hosts.append((display_name, host, port, api_key))
+        logger.info(f"Found Pi-hole host: {display_name} -> {host}:{port}")
+
+    logger.info(f"Loaded {len(pihole_hosts)} Pi-hole hosts from Ansible inventory")
+    return pihole_hosts
 
 
 def load_pihole_hosts_from_env():
