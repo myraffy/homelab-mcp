@@ -72,7 +72,7 @@ class AnsibleConfigManager:
             )
 
             logger.info(f"Loaded Ansible inventory from: {self.inventory_path}")
-            logger.info(f"Hosts: {len(self.inventory.get_hosts())}, Groups: {len(self.inventory.get_groups())}")
+            logger.info(f"Hosts: {len(self.inventory.get_hosts())}, Groups: {len(self.inventory.groups)}")
 
         except Exception as e:
             logger.error(f"Error initializing Ansible: {e}")
@@ -203,7 +203,7 @@ class AnsibleConfigManager:
         try:
             return {
                 "hosts": len(self.inventory.get_hosts()),
-                "groups": len(self.inventory.get_groups()),
+                "groups": len(self.inventory.groups),
                 "group_names": sorted(list(self.inventory.groups.keys())),
             }
         except Exception as e:
@@ -287,7 +287,7 @@ class AnsibleConfigManager:
                     groups[group_name].add(host.name)
 
                 # Process child groups with accumulated vars
-                for child_group in group_obj.get_immediate_children():
+                for child_group in group_obj.child_groups:
                     process_group(child_group, current_groups, merged_vars)
                     # Also add child group's hosts to parent group
                     if child_group.name in groups:
