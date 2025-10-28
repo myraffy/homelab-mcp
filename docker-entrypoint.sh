@@ -40,7 +40,7 @@ IFS=',' read -ra SERVERS <<< "$ENABLED_SERVERS"
 # Validate at least one server is specified
 if [ ${#SERVERS[@]} -eq 0 ]; then
     echo "ERROR: No servers enabled. Set ENABLED_SERVERS environment variable." >&2
-    echo "Example: ENABLED_SERVERS=docker,ping,ollama,pihole,unifi,registry" >&2
+    echo "Example: ENABLED_SERVERS=docker,ping,ollama,pihole,unifi,ups,registry" >&2
     exit 1
 fi
 
@@ -102,9 +102,18 @@ start_server() {
                 exit 1
             fi
             ;;
+        ups)
+            if [ -f "ups_mcp_server.py" ]; then
+                echo "Starting UPS Monitor MCP server..." >&2
+                exec python ups_mcp_server.py
+            else
+                echo "ERROR: ups_mcp_server.py not found" >&2
+                exit 1
+            fi
+            ;;
         *)
             echo "ERROR: Unknown server '$server'" >&2
-            echo "Valid servers: docker, ping, ollama, pihole, unifi, registry" >&2
+            echo "Valid servers: docker, ping, ollama, pihole, unifi, ups, registry" >&2
             exit 1
             ;;
     esac
