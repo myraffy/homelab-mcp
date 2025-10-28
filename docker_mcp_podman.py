@@ -71,7 +71,7 @@ def load_container_hosts_from_ansible(inventory=None):
         return load_container_hosts_from_env()
 
     # Load Docker hosts
-    docker_group_name = os.getenv("DOCKER_ANSIBLE_GROUP", "Ubuntu_Server")
+    docker_group_name = os.getenv("DOCKER_ANSIBLE_GROUP", "docker_hosts")
     docker_hosts = manager.get_group_hosts(docker_group_name)
     for hostname, ip in docker_hosts.items():
         port = manager.get_host_variable(hostname, "docker_api_port", "2375")
