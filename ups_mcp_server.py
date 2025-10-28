@@ -31,6 +31,7 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
+from ansible_config_manager import AnsibleConfigManager
 from mcp_config_loader import load_env_file, COMMON_ALLOWED_ENV_VARS
 
 server = Server("ups-monitor")
@@ -77,7 +78,7 @@ NUT_STATUS_CODES = {
 
 def load_ansible_inventory():
     """
-    Load and cache the Ansible inventory
+    Load NUT server configuration from Ansible inventory using centralized config manager
     Returns dict with nut_servers configuration
     """
     global INVENTORY_DATA
@@ -85,72 +86,71 @@ def load_ansible_inventory():
     if INVENTORY_DATA is not None:
         return INVENTORY_DATA
 
-    if not ANSIBLE_INVENTORY_PATH or not Path(ANSIBLE_INVENTORY_PATH).exists():
-        logger.error(f"Ansible inventory not found at: {ANSIBLE_INVENTORY_PATH}")
+    if not ANSIBLE_INVENTORY_PATH:
+        logger.error("No Ansible inventory path provided")
         return {"nut_servers": {}}
 
-    try:
-        with open(ANSIBLE_INVENTORY_PATH, "r") as f:
-            inventory = yaml.safe_load(f)
+    # Use centralized config manager
+    manager = AnsibleConfigManager(
+        inventory_path=ANSIBLE_INVENTORY_PATH,
+        logger_obj=logger
+    )
 
-        nut_servers = {}
-
-        # Navigate to nut_servers group
-        all_group = inventory.get("all", {})
-        children = all_group.get("children", {})
-        nut_group = children.get("nut_servers", {})
-
-        # Process each NUT server
-        for hostname, host_vars in nut_group.get("hosts", {}).items():
-            if not host_vars:
-                host_vars = {}
-
-            # Extract configuration
-            display_name = hostname.split(".")[0]
-            ansible_host = host_vars.get("ansible_host", hostname.split(".")[0])
-            nut_port = host_vars.get("nut_port", DEFAULT_NUT_PORT)
-            nut_username = host_vars.get("nut_username", DEFAULT_NUT_USERNAME)
-            nut_password = host_vars.get("nut_password", DEFAULT_NUT_PASSWORD)
-
-            # UPS devices can be a list or single string
-            ups_devices = host_vars.get("ups_devices", [])
-            if isinstance(ups_devices, str):
-                ups_devices = [{"name": ups_devices, "description": ""}]
-            elif isinstance(ups_devices, list) and ups_devices:
-                # Normalize to list of dicts
-                normalized_devices = []
-                for device in ups_devices:
-                    if isinstance(device, str):
-                        normalized_devices.append({"name": device, "description": ""})
-                    elif isinstance(device, dict):
-                        normalized_devices.append(device)
-                ups_devices = normalized_devices
-
-            if not ups_devices:
-                # Default to 'ups' if not specified
-                ups_devices = [{"name": "ups", "description": "UPS"}]
-
-            nut_servers[display_name] = {
-                "hostname": hostname,
-                "host": ansible_host,
-                "port": nut_port,
-                "username": nut_username,
-                "password": nut_password,
-                "ups_devices": ups_devices,
-            }
-            logger.info(
-                f"Found NUT server: {display_name} -> {ansible_host}:{nut_port} "
-                f"({len(ups_devices)} UPS device(s))"
-            )
-
-        INVENTORY_DATA = {"nut_servers": nut_servers}
-        logger.info(f"Loaded {len(nut_servers)} NUT servers from Ansible inventory")
-
-        return INVENTORY_DATA
-
-    except Exception as e:
-        logger.error(f"Error loading Ansible inventory: {e}", exc_info=True)
+    if not manager.is_available():
+        logger.error(f"Ansible inventory not accessible at: {ANSIBLE_INVENTORY_PATH}")
         return {"nut_servers": {}}
+
+    # Load NUT servers group
+    nut_hosts = manager.get_group_hosts("nut_servers")
+    if not nut_hosts:
+        logger.warning("No hosts found in 'nut_servers' group")
+        return {"nut_servers": {}}
+
+    nut_servers = {}
+    for hostname, host_ip in nut_hosts.items():
+        # Extract NUT-specific configuration
+        nut_port_str = manager.get_host_variable(hostname, "nut_port", str(DEFAULT_NUT_PORT))
+        nut_username = manager.get_host_variable(hostname, "nut_username", DEFAULT_NUT_USERNAME)
+        nut_password = manager.get_host_variable(hostname, "nut_password", DEFAULT_NUT_PASSWORD)
+        
+        # Try to get UPS devices configuration
+        ups_devices_raw = manager.get_host_variable(hostname, "ups_devices", "ups")
+        
+        # Normalize UPS devices to list of dicts
+        if isinstance(ups_devices_raw, str):
+            ups_devices = [{"name": ups_devices_raw, "description": ""}]
+        elif isinstance(ups_devices_raw, list):
+            normalized_devices = []
+            for device in ups_devices_raw:
+                if isinstance(device, str):
+                    normalized_devices.append({"name": device, "description": ""})
+                elif isinstance(device, dict):
+                    normalized_devices.append(device)
+            ups_devices = normalized_devices if normalized_devices else [{"name": "ups", "description": "UPS"}]
+        else:
+            ups_devices = [{"name": "ups", "description": "UPS"}]
+
+        try:
+            nut_port = int(nut_port_str)
+        except (ValueError, TypeError):
+            nut_port = DEFAULT_NUT_PORT
+
+        nut_servers[hostname] = {
+            "hostname": hostname,
+            "host": host_ip,
+            "port": nut_port,
+            "username": nut_username,
+            "password": nut_password,
+            "ups_devices": ups_devices,
+        }
+        logger.info(
+            f"Found NUT server: {hostname} -> {host_ip}:{nut_port} "
+            f"({len(ups_devices)} UPS device(s))"
+        )
+
+    INVENTORY_DATA = {"nut_servers": nut_servers}
+    logger.info(f"Loaded {len(nut_servers)} NUT servers from Ansible inventory")
+    return INVENTORY_DATA
 
 
 async def query_nut_server(
