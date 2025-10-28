@@ -210,6 +210,110 @@ class AnsibleConfigManager:
             logger.error(f"Error getting inventory summary: {e}")
             return {}
 
+    def get_all_hosts_with_inheritance(self) -> Dict:
+        """
+        Get all hosts and groups with proper variable inheritance.
+        
+        Implements two-pass algorithm:
+        1. First pass: Collect group variables
+        2. Second pass: Process groups with inherited variables from parent groups
+        
+        Returns:
+            Dict with structure: {"hosts": {...}, "groups": {...}}
+            Each host includes merged variables from its groups
+        """
+        if not self.is_available():
+            return {"hosts": {}, "groups": {}}
+
+        try:
+            hosts = {}
+            groups = {}
+            group_vars = {}
+
+            def collect_group_vars(group_obj, parent_groups=None):
+                """First pass: collect all group variables"""
+                if parent_groups is None:
+                    parent_groups = []
+
+                group_name = group_obj.name
+                current_groups = parent_groups + [group_name]
+
+                # Store group vars
+                if group_name not in group_vars:
+                    group_vars[group_name] = {}
+
+                group_vars[group_name] = group_obj.get_vars().copy()
+
+                # Recursively process children
+                for child_group in group_obj.get_descendants():
+                    if child_group.name not in group_vars:
+                        collect_group_vars(child_group, current_groups)
+
+            def process_group(group_obj, parent_groups=None, inherited_vars=None):
+                """Second pass: process groups with inherited vars"""
+                if parent_groups is None:
+                    parent_groups = []
+                if inherited_vars is None:
+                    inherited_vars = {}
+
+                group_name = group_obj.name
+                current_groups = parent_groups + [group_name]
+
+                # Merge inherited vars with this group's vars
+                merged_vars = inherited_vars.copy()
+                if group_name in group_vars:
+                    merged_vars.update(group_vars[group_name])
+
+                # Process hosts in this group
+                for host in group_obj.get_hosts():
+                    if host.name not in hosts:
+                        hosts[host.name] = {"groups": [], "vars": {}}
+
+                    # Add groups
+                    if group_name not in hosts[host.name]["groups"]:
+                        hosts[host.name]["groups"].append(group_name)
+
+                    # Merge vars: group vars first, then host vars override
+                    hosts[host.name]["vars"].update(merged_vars)
+                    host_vars = self.variable_manager.get_vars(host=host)
+                    hosts[host.name]["vars"].update(host_vars)
+
+                # Track group membership
+                if group_name not in groups:
+                    groups[group_name] = set()
+
+                # Add hosts to group tracking
+                for host in group_obj.get_hosts():
+                    groups[group_name].add(host.name)
+
+                # Process child groups with accumulated vars
+                for child_group in group_obj.get_immediate_children():
+                    process_group(child_group, current_groups, merged_vars)
+                    # Also add child group's hosts to parent group
+                    if child_group.name in groups:
+                        groups[group_name].update(groups[child_group.name])
+
+            # Start with 'all' group
+            all_group = self.inventory.groups.get("all")
+            if all_group:
+                # First pass: collect group vars
+                collect_group_vars(all_group)
+
+                # Second pass: process groups
+                process_group(all_group)
+
+            # Convert group sets to lists for JSON serialization
+            groups_list = {k: list(v) for k, v in groups.items()}
+
+            logger.info(
+                f"Loaded {len(hosts)} hosts and {len(groups_list)} groups with inheritance"
+            )
+            return {"hosts": hosts, "groups": groups_list}
+
+        except Exception as e:
+            logger.error(f"Error getting all hosts with inheritance: {e}", exc_info=True)
+            return {"hosts": {}, "groups": {}}
+
     def clear_cache(self):
         """Clear internal cache."""
         self._group_cache.clear()
