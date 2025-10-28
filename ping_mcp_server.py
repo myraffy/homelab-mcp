@@ -684,6 +684,10 @@ async def handle_call_tool_impl(
             output = f"=== PINGING ALL HOSTS ===\n"
             output += f"Total: {len(hostnames)} hosts, Packets: {count}, Timeout: {timeout}s\n\n"
 
+            if not hostnames:
+                output += "No hosts found in inventory\n"
+                return [types.TextContent(type="text", text=output)]
+
             # Ping all hosts concurrently
             tasks = []
             for hostname in hostnames:
@@ -702,7 +706,10 @@ async def handle_call_tool_impl(
             # Summary
             reachable = sum(1 for r in results if r["reachable"])
             output += f"\n--- SUMMARY ---\n"
-            output += f"Reachable: {reachable}/{len(results)} ({(reachable/len(results)*100):.1f}%)\n"
+            if len(results) > 0:
+                output += f"Reachable: {reachable}/{len(results)} ({(reachable/len(results)*100):.1f}%)\n"
+            else:
+                output += "No results to summarize\n"
 
             return [types.TextContent(type="text", text=output)]
 
